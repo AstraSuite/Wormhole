@@ -63,14 +63,100 @@ void ScreenCastPortal::Start(const QDBusObjectPath& handle,
                             const QDBusMessage& message) {
     message.setDelayedReply(true);
 
-    if (!m_sessions.contains(session_handle.path())) {
-        QDBusMessage reply = message.createReply();
-        reply << static_cast<uint>(2) << QVariantMap();
-        QDBusConnection::sessionBus().send(reply);
+    const QString sessionPath = session_handle.path();
+    if (!m_sessions.contains(sessionPath)) {
+        sendReply(message, 2, QVariantMap());
         return;
     }
 
+    const SessionData data = m_sessions.value(sessionPath);
+
+    RestoreEntry entry;
+    if (data.persistMode != NoPersist && RestoreStore::instance()->take(data.restoreToken, app_id, entry)) {
+        SelectedSource source;
+        source.isWindow = entry.isWindow;
+        source.outputName = entry.outputName;
+        source.windowAppId = entry.windowAppId;
+        source.windowTitle = entry.windowTitle;
+        source.windowAddress = entry.windowAddress;
+        source.x = entry.x;
+        source.y = entry.y;
+        source.fps = entry.fps;
+        source.paintCursor = data.cursorMode == Embedded;
+
+        QVariantMap results;
+        if (startStream(sessionPath, source, results)) {
+            results.insert(QStringLiteral("restore_token"), data.restoreToken);
+            sendReply(message, 0, results);
+            return;
+        }
+
+        RestoreStore::instance()->remove(data.restoreToken);
+    }
+
     launchScreenChooser(handle, session_handle, app_id, parent_window, message);
+}
+
+void ScreenCastPortal::sendReply(const QDBusMessage& message, uint response, const QVariantMap& results) {
+    QDBusMessage reply = message.createReply();
+    reply << response << results;
+    QDBusConnection::sessionBus().send(reply);
+}
+
+bool ScreenCastPortal::startStream(const QString& sessionPath, const SelectedSource& source, QVariantMap& results) {
+    auto* capture = new screencast::WaylandCapture(this);
+    const bool started = source.isWindow
+        ? capture->captureToplevel(source.windowAppId, source.windowTitle, source.paintCursor, source.fps)
+        : capture->captureOutput(source.outputName, source.paintCursor, source.fps);
+
+    if (!started) {
+        capture->deleteLater();
+        return false;
+    }
+
+    const QSize size = capture->frameSize();
+    const QString label = source.isWindow
+        ? (source.windowTitle.isEmpty() ? source.windowAppId : source.windowTitle)
+        : source.outputName;
+
+    const uint32_t nodeId = screencast::PipeWireStreamManager::instance()->createStream(
+        label, size.width(), size.height(), source.fps);
+
+    if (nodeId == 0) {
+        capture->deleteLater();
+        return false;
+    }
+
+    connect(capture, &screencast::WaylandCapture::frameReady, this, [nodeId](const QImage& frame) {
+        screencast::PipeWireStreamManager::instance()->pushFrame(nodeId, frame);
+    });
+    connect(capture, &screencast::WaylandCapture::stopped, this, [this, sessionPath]() {
+        closeSession(sessionPath);
+    });
+
+    if (m_sessions.contains(sessionPath)) {
+        auto& sess = m_sessions[sessionPath];
+        sess.pipewireNodeId = nodeId;
+        sess.capture = capture;
+    }
+
+    ScreenCastStream stream;
+    stream.nodeId = nodeId;
+    stream.properties.insert(QStringLiteral("position"),
+                             QVariant::fromValue(ScreenCastPosition{ source.x, source.y }));
+    stream.properties.insert(QStringLiteral("size"),
+                             QVariant::fromValue(ScreenCastSize{ size.width(), size.height() }));
+    stream.properties.insert(QStringLiteral("source_type"),
+                             static_cast<uint>(source.isWindow ? Window : Monitor));
+    stream.properties.insert(QStringLiteral("mapping_id"),
+                             source.isWindow ? source.windowAddress : source.outputName);
+
+    ScreenCastStreamList streams;
+    streams.append(stream);
+
+    results.insert(QStringLiteral("streams"), QVariant::fromValue(streams));
+    results.insert(QStringLiteral("source_type"), static_cast<uint>(source.isWindow ? Window : Monitor));
+    return true;
 }
 
 void ScreenCastPortal::launchScreenChooser(const QDBusObjectPath& handle,
@@ -82,8 +168,9 @@ void ScreenCastPortal::launchScreenChooser(const QDBusObjectPath& handle,
     QStringList args;
     args << QStringLiteral("--screencast");
     args << QStringLiteral("--app-id") << appId;
-    args << QStringLiteral("--cursor-mode")
-         << QString::number(m_sessions.value(sessionHandle.path()).cursorMode);
+    const SessionData data = m_sessions.value(sessionHandle.path());
+    args << QStringLiteral("--cursor-mode") << QString::number(data.cursorMode);
+    args << QStringLiteral("--persist-mode") << QString::number(data.persistMode);
     if (!parentWindow.isEmpty()) {
         args << QStringLiteral("--parent-window") << parentWindow;
     }
@@ -109,9 +196,7 @@ void ScreenCastPortal::launchScreenChooser(const QDBusObjectPath& handle,
             if (r.requestObject) r.requestObject->deleteLater();
             if (r.process) r.process->deleteLater();
 
-            QDBusMessage reply = r.message.createReply();
-            reply << static_cast<uint>(1) << QVariantMap();
-            QDBusConnection::sessionBus().send(reply);
+            sendReply(r.message, 1, QVariantMap());
         }
     });
 
@@ -126,82 +211,52 @@ void ScreenCastPortal::launchScreenChooser(const QDBusObjectPath& handle,
         if (req.requestObject) req.requestObject->deleteLater();
         if (req.process) req.process->deleteLater();
 
-        QDBusMessage reply = req.message.createReply();
         QVariantMap results;
 
         if (exitCode == 0 && !stdoutData.isEmpty()) {
-            QJsonDocument doc = QJsonDocument::fromJson(stdoutData);
+            const QJsonDocument doc = QJsonDocument::fromJson(stdoutData);
             if (!doc.isNull()) {
                 const QJsonObject root = doc.object();
-                const bool isWindow = root.value(QStringLiteral("type")).toString(QStringLiteral("screen")) == QLatin1String("window");
-                const QString name = root.value(QStringLiteral("name")).toString();
-                const QString address = root.value(QStringLiteral("address")).toString();
-                const QString title = root.value(QStringLiteral("title")).toString();
-                const QString className = root.value(QStringLiteral("className")).toString();
-                const int fps = root.value(QStringLiteral("fps")).toInt(60);
-                const uint requestedCursor = m_sessions.value(req.sessionHandle.path()).cursorMode;
-                const bool paintCursor = requestedCursor == Embedded
+                const QString sessionPath = req.sessionHandle.path();
+                const SessionData data = m_sessions.value(sessionPath);
+
+                SelectedSource source;
+                source.isWindow = root.value(QStringLiteral("type")).toString(QStringLiteral("screen")) == QLatin1String("window");
+                source.outputName = root.value(QStringLiteral("name")).toString();
+                source.windowAppId = root.value(QStringLiteral("className")).toString();
+                source.windowTitle = root.value(QStringLiteral("title")).toString();
+                source.windowAddress = root.value(QStringLiteral("address")).toString();
+                source.x = root.value(QStringLiteral("x")).toInt(0);
+                source.y = root.value(QStringLiteral("y")).toInt(0);
+                source.fps = root.value(QStringLiteral("fps")).toInt(60);
+                source.paintCursor = data.cursorMode == Embedded
                     && root.value(QStringLiteral("cursorMode")).toInt(Hidden) == Embedded;
-                const QString label = isWindow ? (title.isEmpty() ? className : title) : name;
 
-                auto* capture = new screencast::WaylandCapture(this);
-                const bool started = isWindow
-                    ? capture->captureToplevel(className, title, paintCursor, fps)
-                    : capture->captureOutput(name, paintCursor, fps);
+                if (startStream(sessionPath, source, results)) {
+                    if (data.persistMode != NoPersist && root.value(QStringLiteral("persist")).toBool()) {
+                        RestoreEntry entry;
+                        entry.appId = req.appId;
+                        entry.isWindow = source.isWindow;
+                        entry.outputName = source.outputName;
+                        entry.windowAppId = source.windowAppId;
+                        entry.windowTitle = source.windowTitle;
+                        entry.windowAddress = source.windowAddress;
+                        entry.x = source.x;
+                        entry.y = source.y;
+                        entry.fps = source.fps;
+                        entry.durable = data.persistMode == PersistUntilRevoked;
 
-                if (started) {
-                    const QSize size = capture->frameSize();
-                    const uint32_t nodeId = screencast::PipeWireStreamManager::instance()->createStream(
-                        label, size.width(), size.height(), fps);
-
-                    if (nodeId != 0) {
-                        connect(capture, &screencast::WaylandCapture::frameReady, this, [nodeId](const QImage& frame) {
-                            screencast::PipeWireStreamManager::instance()->pushFrame(nodeId, frame);
-                        });
-
-                        const QString sessionPath = req.sessionHandle.path();
-                        connect(capture, &screencast::WaylandCapture::stopped, this, [this, sessionPath]() {
-                            closeSession(sessionPath);
-                        });
-
-                        if (m_sessions.contains(sessionPath)) {
-                            auto& sess = m_sessions[sessionPath];
-                            sess.pipewireNodeId = nodeId;
-                            sess.capture = capture;
-                        }
-
-                        ScreenCastStream stream;
-                        stream.nodeId = nodeId;
-                        stream.properties.insert(QStringLiteral("position"), QVariant::fromValue(ScreenCastPosition{
-                            root.value(QStringLiteral("x")).toInt(0),
-                            root.value(QStringLiteral("y")).toInt(0)
-                        }));
-                        stream.properties.insert(QStringLiteral("size"), QVariant::fromValue(ScreenCastSize{ size.width(), size.height() }));
-                        stream.properties.insert(QStringLiteral("source_type"), static_cast<uint>(isWindow ? Window : Monitor));
-                        stream.properties.insert(QStringLiteral("mapping_id"), isWindow ? address : name);
-
-                        ScreenCastStreamList streams;
-                        streams.append(stream);
-
-                        results.insert(QStringLiteral("streams"), QVariant::fromValue(streams));
-                        results.insert(QStringLiteral("source_type"), static_cast<uint>(isWindow ? Window : Monitor));
-
-                        if (root.value(QStringLiteral("persist")).toBool()) {
-                            results.insert(QStringLiteral("restore_token"), QUuid::createUuid().toString(QUuid::WithoutBraces));
-                        }
-
-                        reply << static_cast<uint>(0) << results;
-                        QDBusConnection::sessionBus().send(reply);
-                        return;
+                        results.insert(QStringLiteral("restore_token"),
+                                       RestoreStore::instance()->add(entry));
                     }
-                }
 
-                capture->deleteLater();
+                    sendReply(req.message, 0, results);
+                    return;
+                }
             }
         }
 
-        reply << static_cast<uint>(1) << results;
-        QDBusConnection::sessionBus().send(reply);
+        sendReply(req.message, 1, results);
     });
 
     process->start(wormholeBin, args);

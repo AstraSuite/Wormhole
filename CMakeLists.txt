@@ -93,6 +93,8 @@ qt_add_executable(wormhole_app
     src/portal/request.cpp
     src/portal/session.hpp
     src/portal/session.cpp
+    src/portal/restorestore.hpp
+    src/portal/restorestore.cpp
     src/portal/filechooserportal.hpp
     src/portal/filechooserportal.cpp
     src/portal/screencastportal.hpp
