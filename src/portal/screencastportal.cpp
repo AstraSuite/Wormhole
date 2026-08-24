@@ -82,6 +82,8 @@ void ScreenCastPortal::launchScreenChooser(const QDBusObjectPath& handle,
     QStringList args;
     args << QStringLiteral("--screencast");
     args << QStringLiteral("--app-id") << appId;
+    args << QStringLiteral("--cursor-mode")
+         << QString::number(m_sessions.value(sessionHandle.path()).cursorMode);
     if (!parentWindow.isEmpty()) {
         args << QStringLiteral("--parent-window") << parentWindow;
     }
@@ -137,7 +139,9 @@ void ScreenCastPortal::launchScreenChooser(const QDBusObjectPath& handle,
                 const QString title = root.value(QStringLiteral("title")).toString();
                 const QString className = root.value(QStringLiteral("className")).toString();
                 const int fps = root.value(QStringLiteral("fps")).toInt(60);
-                const bool paintCursor = root.value(QStringLiteral("cursorMode")).toInt(Hidden) == Embedded;
+                const uint requestedCursor = m_sessions.value(req.sessionHandle.path()).cursorMode;
+                const bool paintCursor = requestedCursor == Embedded
+                    && root.value(QStringLiteral("cursorMode")).toInt(Hidden) == Embedded;
                 const QString label = isWindow ? (title.isEmpty() ? className : title) : name;
 
                 auto* capture = new screencast::WaylandCapture(this);

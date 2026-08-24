@@ -11,7 +11,8 @@ StyledRect {
 
     property var selectedItem: null
     property int currentTab: 0 // 0: Displays, 1: Windows
-    property bool includeCursor: true
+    readonly property bool cursorAllowed: AppController.cursorMode === 2
+    property bool includeCursor: cursorAllowed
     property bool rememberChoice: false
 
     signal accepted(var result)
@@ -501,6 +502,7 @@ StyledRect {
         StyledCheckBox {
             id: cursorCheck
             text: qsTr("Include pointer")
+            visible: root.cursorAllowed
             checked: root.includeCursor
             onCheckedChanged: root.includeCursor = checked
         }
