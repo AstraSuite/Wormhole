@@ -189,7 +189,7 @@ private:
     uint m_availableSourceTypes = 7; // Monitor | Window | Virtual
     uint m_availableCursorModes = 7; // Hidden | Embedded | Metadata
     uint m_cursorMode = 1;
-    bool m_allowToken = true;
+    bool m_allowToken = false;
     bool m_multipleSources = false;
 
     bool m_isScreenshotInteractive = true;

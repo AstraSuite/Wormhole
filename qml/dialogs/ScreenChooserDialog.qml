@@ -12,6 +12,7 @@ StyledRect {
     property var selectedItem: null
     property int currentTab: 0 // 0: Displays, 1: Windows
     readonly property bool cursorAllowed: AppController.cursorMode === 2
+    readonly property bool rememberAllowed: AppController.allowToken
     property bool includeCursor: cursorAllowed
     property bool rememberChoice: false
 
@@ -510,6 +511,7 @@ StyledRect {
         StyledCheckBox {
             id: rememberCheck
             text: qsTr("Remember choice")
+            visible: root.rememberAllowed
             checked: root.rememberChoice
             onCheckedChanged: root.rememberChoice = checked
         }

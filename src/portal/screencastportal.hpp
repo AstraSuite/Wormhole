@@ -13,6 +13,7 @@
 #include <QString>
 #include <QVariantMap>
 #include "request.hpp"
+#include "restorestore.hpp"
 #include "session.hpp"
 #include "../screencast/pipewirestream.hpp"
 #include "../screencast/waylandcapture.hpp"
@@ -135,6 +136,18 @@ public slots:
                             const QDBusMessage& message);
 
 private:
+    struct SelectedSource {
+        bool isWindow = false;
+        QString outputName;
+        QString windowAppId;
+        QString windowTitle;
+        QString windowAddress;
+        int x = 0;
+        int y = 0;
+        int fps = 60;
+        bool paintCursor = false;
+    };
+
     struct SessionData {
         QString appId;
         uint types = Monitor | Window;
@@ -154,6 +167,9 @@ private:
     };
 
     void closeSession(const QString& sessionPath);
+
+    bool startStream(const QString& sessionPath, const SelectedSource& source, QVariantMap& results);
+    static void sendReply(const QDBusMessage& message, uint response, const QVariantMap& results);
 
     void launchScreenChooser(const QDBusObjectPath& handle,
                              const QDBusObjectPath& sessionHandle,
