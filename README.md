@@ -1,4 +1,4 @@
-# Wormhole 🌌
+# Wormhole
 
 **Wormhole** is a native, modern, Material 3 Expressive implementation of the `xdg-desktop-portal` backend designed for Wayland & Hyprland desktop environments.
 
