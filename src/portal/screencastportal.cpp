@@ -29,16 +29,7 @@ uint ScreenCastPortal::CreateSession(const QDBusObjectPath& /*handle*/,
 
     auto* sessionObj = new PortalSession(session_handle.path(), app_id, this);
     connect(sessionObj, &PortalSession::closed, this, [this, session_handle]() {
-        if (m_sessions.contains(session_handle.path())) {
-            auto data = m_sessions.take(session_handle.path());
-            if (data.worker) {
-                data.worker->stop();
-                delete data.worker;
-            }
-            if (data.pipewireNodeId != 0) {
-                screencast::PipeWireStreamManager::instance()->stopStream(data.pipewireNodeId);
-            }
-        }
+        closeSession(session_handle.path());
     });
 
     return 0;
@@ -139,64 +130,92 @@ void ScreenCastPortal::launchScreenChooser(const QDBusObjectPath& handle,
         if (exitCode == 0 && !stdoutData.isEmpty()) {
             QJsonDocument doc = QJsonDocument::fromJson(stdoutData);
             if (!doc.isNull()) {
-                QJsonObject root = doc.object();
-                QString type = root.value(QStringLiteral("type")).toString(QStringLiteral("screen"));
-                QString name = root.value(QStringLiteral("name")).toString();
-                QString addr = root.value(QStringLiteral("address")).toString();
-                int width = root.value(QStringLiteral("width")).toInt(1920);
-                int height = root.value(QStringLiteral("height")).toInt(1080);
-                int fps = root.value(QStringLiteral("fps")).toInt(60);
-                bool isWindow = (type == QLatin1String("window"));
+                const QJsonObject root = doc.object();
+                const bool isWindow = root.value(QStringLiteral("type")).toString(QStringLiteral("screen")) == QLatin1String("window");
+                const QString name = root.value(QStringLiteral("name")).toString();
+                const QString address = root.value(QStringLiteral("address")).toString();
+                const QString title = root.value(QStringLiteral("title")).toString();
+                const QString className = root.value(QStringLiteral("className")).toString();
+                const int fps = root.value(QStringLiteral("fps")).toInt(60);
+                const bool paintCursor = root.value(QStringLiteral("cursorMode")).toInt(Hidden) == Embedded;
+                const QString label = isWindow ? (title.isEmpty() ? className : title) : name;
 
-                uint32_t nodeId = screencast::PipeWireStreamManager::instance()->createStream(
-                    isWindow ? root.value(QStringLiteral("title")).toString(QStringLiteral("Window")) : name,
-                    width, height, fps
-                );
-                qDebug() << "[WORMHOLE] Created PipeWire stream nodeId:" << nodeId << "for" << (isWindow ? addr : name);
+                auto* capture = new screencast::WaylandCapture(this);
+                const bool started = isWindow
+                    ? capture->captureToplevel(className, title, paintCursor, fps)
+                    : capture->captureOutput(name, paintCursor, fps);
 
-                if (nodeId != 0) {
-                    auto* worker = new screencast::ScreenCaptureWorker(nodeId, name, isWindow, addr, this);
-                    worker->start(fps);
+                if (started) {
+                    const QSize size = capture->frameSize();
+                    const uint32_t nodeId = screencast::PipeWireStreamManager::instance()->createStream(
+                        label, size.width(), size.height(), fps);
 
-                    if (m_sessions.contains(req.sessionHandle.path())) {
-                        auto& sess = m_sessions[req.sessionHandle.path()];
-                        sess.pipewireNodeId = nodeId;
-                        sess.worker = worker;
+                    if (nodeId != 0) {
+                        connect(capture, &screencast::WaylandCapture::frameReady, this, [nodeId](const QImage& frame) {
+                            screencast::PipeWireStreamManager::instance()->pushFrame(nodeId, frame);
+                        });
+
+                        const QString sessionPath = req.sessionHandle.path();
+                        connect(capture, &screencast::WaylandCapture::stopped, this, [this, sessionPath]() {
+                            closeSession(sessionPath);
+                        });
+
+                        if (m_sessions.contains(sessionPath)) {
+                            auto& sess = m_sessions[sessionPath];
+                            sess.pipewireNodeId = nodeId;
+                            sess.capture = capture;
+                        }
+
+                        ScreenCastStream stream;
+                        stream.nodeId = nodeId;
+                        stream.properties.insert(QStringLiteral("position"), QVariant::fromValue(ScreenCastPosition{
+                            root.value(QStringLiteral("x")).toInt(0),
+                            root.value(QStringLiteral("y")).toInt(0)
+                        }));
+                        stream.properties.insert(QStringLiteral("size"), QVariant::fromValue(ScreenCastSize{ size.width(), size.height() }));
+                        stream.properties.insert(QStringLiteral("source_type"), static_cast<uint>(isWindow ? Window : Monitor));
+                        stream.properties.insert(QStringLiteral("mapping_id"), isWindow ? address : name);
+
+                        ScreenCastStreamList streams;
+                        streams.append(stream);
+
+                        results.insert(QStringLiteral("streams"), QVariant::fromValue(streams));
+                        results.insert(QStringLiteral("source_type"), static_cast<uint>(isWindow ? Window : Monitor));
+
+                        if (root.value(QStringLiteral("persist")).toBool()) {
+                            results.insert(QStringLiteral("restore_token"), QUuid::createUuid().toString(QUuid::WithoutBraces));
+                        }
+
+                        reply << static_cast<uint>(0) << results;
+                        QDBusConnection::sessionBus().send(reply);
+                        return;
                     }
-
-                    // Build D-Bus streams array a(ua{sv}) matching xdp-hyprland format exactly
-                    ScreenCastStream stream;
-                    stream.nodeId = nodeId;
-                    stream.properties.insert(QStringLiteral("position"), QVariant::fromValue(ScreenCastPosition{ 0, 0 }));
-                    stream.properties.insert(QStringLiteral("size"), QVariant::fromValue(ScreenCastSize{ width, height }));
-                    stream.properties.insert(QStringLiteral("source_type"), static_cast<uint>(isWindow ? 2 : 1));
-                    stream.properties.insert(QStringLiteral("mapping_id"), isWindow ? addr : name);
-
-                    ScreenCastStreamList streams;
-                    streams.append(stream);
-
-                    results.insert(QStringLiteral("streams"), QVariant::fromValue(streams));
-                    results.insert(QStringLiteral("source_type"), static_cast<uint>(isWindow ? 2 : 1));
-
-                    if (root.value(QStringLiteral("persist")).toBool()) {
-                        QString token = QUuid::createUuid().toString(QUuid::WithoutBraces);
-                        results.insert(QStringLiteral("restore_token"), token);
-                    }
-
-                    qDebug() << "[WORMHOLE] Sending Start success reply with nodeId:" << nodeId;
-                    reply << static_cast<uint>(0) << results;
-                    QDBusConnection::sessionBus().send(reply);
-                    return;
                 }
+
+                capture->deleteLater();
             }
         }
 
-        // Cancelled or failure
         reply << static_cast<uint>(1) << results;
         QDBusConnection::sessionBus().send(reply);
     });
 
     process->start(wormholeBin, args);
+}
+
+void ScreenCastPortal::closeSession(const QString& sessionPath) {
+    if (!m_sessions.contains(sessionPath)) {
+        return;
+    }
+
+    auto data = m_sessions.take(sessionPath);
+    if (data.capture) {
+        data.capture->stop();
+        data.capture->deleteLater();
+    }
+    if (data.pipewireNodeId != 0) {
+        screencast::PipeWireStreamManager::instance()->stopStream(data.pipewireNodeId);
+    }
 }
 
 } // namespace wormhole::portal

@@ -24,6 +24,7 @@ public:
         MakeModelRole,
         ResolutionRole,
         RefreshRateRole,
+        RefreshRateHzRole,
         ScaleRole,
         FocusedRole,
         ActiveWorkspaceRole,

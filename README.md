@@ -42,7 +42,13 @@ It provides a unified D-Bus portal daemon (`xdg-desktop-portal-wormhole`) and Ma
 - **Qt 6.5+** (`Core`, `Gui`, `Qml`, `Quick`, `QuickControls2`, `QuickEffects`, `DBus`, `Concurrent`, `Svg`, `Network`)
 - **PipeWire** (`libpipewire-0.3`)
 - **Wayland Client** (`wayland-client`)
+- **Wayland Protocols** (`wayland-protocols` ≥ 1.38) and `wayland-scanner`
 - **Atlas** (runtime dependency for file choosing)
+
+Screen capture uses `ext-image-copy-capture-v1`, so the compositor has to
+implement it along with `ext-image-capture-source-v1`. Window capture
+additionally needs `ext-foreign-toplevel-list-v1`. Hyprland supports all three
+since 0.47, Sway since 1.11.
 
 ### Build Commands
 ```bash

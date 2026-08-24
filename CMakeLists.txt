@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.19)
-project(wormhole VERSION 1.0.0 LANGUAGES CXX)
+project(wormhole VERSION 1.0.0 LANGUAGES C CXX)
 
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
     set(CMAKE_INSTALL_PREFIX "/usr" CACHE PATH "Default install prefix" FORCE)
@@ -26,6 +26,40 @@ find_package(Qt6 6.5 REQUIRED COMPONENTS
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(PipeWire IMPORTED_TARGET libpipewire-0.3 REQUIRED)
 pkg_check_modules(WaylandClient IMPORTED_TARGET wayland-client REQUIRED)
+pkg_check_modules(WaylandProtocols REQUIRED wayland-protocols>=1.38)
+pkg_get_variable(WAYLAND_PROTOCOLS_DIR wayland-protocols pkgdatadir)
+pkg_get_variable(WAYLAND_SCANNER wayland-scanner wayland_scanner)
+
+set(WAYLAND_PROTOCOL_OUT "${CMAKE_CURRENT_BINARY_DIR}/wayland-protocols")
+file(MAKE_DIRECTORY "${WAYLAND_PROTOCOL_OUT}")
+
+set(WAYLAND_PROTOCOL_XML
+    "${WAYLAND_PROTOCOLS_DIR}/staging/ext-image-capture-source/ext-image-capture-source-v1.xml"
+    "${WAYLAND_PROTOCOLS_DIR}/staging/ext-image-copy-capture/ext-image-copy-capture-v1.xml"
+    "${WAYLAND_PROTOCOLS_DIR}/staging/ext-foreign-toplevel-list/ext-foreign-toplevel-list-v1.xml"
+)
+
+set(WAYLAND_PROTOCOL_SOURCES "")
+foreach(protocol IN LISTS WAYLAND_PROTOCOL_XML)
+    get_filename_component(protocolName "${protocol}" NAME_WE)
+    set(protocolHeader "${WAYLAND_PROTOCOL_OUT}/${protocolName}-client-protocol.h")
+    set(protocolCode "${WAYLAND_PROTOCOL_OUT}/${protocolName}-protocol.c")
+
+    add_custom_command(
+        OUTPUT "${protocolHeader}"
+        COMMAND "${WAYLAND_SCANNER}" client-header "${protocol}" "${protocolHeader}"
+        DEPENDS "${protocol}"
+        VERBATIM
+    )
+    add_custom_command(
+        OUTPUT "${protocolCode}"
+        COMMAND "${WAYLAND_SCANNER}" private-code "${protocol}" "${protocolCode}"
+        DEPENDS "${protocol}"
+        VERBATIM
+    )
+
+    list(APPEND WAYLAND_PROTOCOL_SOURCES "${protocolHeader}" "${protocolCode}")
+endforeach()
 
 qt_standard_project_setup(REQUIRES 6.5)
 
@@ -48,8 +82,8 @@ qt_add_executable(wormhole_app
     src/screencast/sourcesmodel.cpp
     src/screencast/pipewirestream.hpp
     src/screencast/pipewirestream.cpp
-    src/screencast/screencopy.hpp
-    src/screencast/screencopy.cpp
+    src/screencast/waylandcapture.hpp
+    src/screencast/waylandcapture.cpp
     src/screencast/previewprovider.hpp
     src/screencast/livescreenitem.hpp
     src/screencast/livescreenitem.cpp
@@ -81,6 +115,7 @@ qt_add_executable(wormhole_app
     src/portal/settingsportal.cpp
     src/portal/portaldaemon.hpp
     src/portal/portaldaemon.cpp
+    ${WAYLAND_PROTOCOL_SOURCES}
 )
 
 set_target_properties(wormhole_app PROPERTIES
@@ -95,6 +130,7 @@ target_include_directories(wormhole_app PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/screencast
     ${CMAKE_CURRENT_SOURCE_DIR}/src/appchooser
     ${CMAKE_CURRENT_SOURCE_DIR}/src/portal
+    ${WAYLAND_PROTOCOL_OUT}
 )
 
 qt_add_qml_module(wormhole_app
