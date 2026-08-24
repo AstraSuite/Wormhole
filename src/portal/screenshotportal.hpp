@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QDBusAbstractAdaptor>
 #include <QDBusConnection>
 #include <QDBusMessage>
 #include <QDBusObjectPath>
@@ -12,7 +13,7 @@
 
 namespace wormhole::portal {
 
-class ScreenshotPortal : public QObject {
+class ScreenshotPortal : public QDBusAbstractAdaptor {
     Q_OBJECT
     Q_CLASSINFO("D-Bus Interface", "org.freedesktop.impl.portal.Screenshot")
     Q_PROPERTY(uint version READ version CONSTANT)
