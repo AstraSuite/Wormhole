@@ -1,0 +1,12 @@
+#!/sbin/openrc-run
+description="Wormhole Material 3 Desktop Portal Daemon"
+supervisor="supervise-daemon"
+
+command="/usr/bin/wormhole"
+command_args="--daemon"
+pidfile="/run/xdg-desktop-portal-wormhole.pid"
+
+depend() {
+    need dbus
+    after graphical
+}

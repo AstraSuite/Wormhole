@@ -1,0 +1,13 @@
+[Unit]
+Description=Wormhole Material 3 Desktop Portal
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+Type=dbus
+BusName=org.freedesktop.impl.portal.desktop.wormhole
+ExecStart=/usr/bin/wormhole --daemon
+Restart=on-failure
+
+[Install]
+WantedBy=graphical-session.target
