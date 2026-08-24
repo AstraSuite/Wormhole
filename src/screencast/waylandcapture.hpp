@@ -6,6 +6,7 @@
 #include <QSize>
 #include <QString>
 #include <cstdint>
+#include <functional>
 
 struct wl_buffer;
 struct wl_display;
@@ -37,6 +38,9 @@ public:
     bool captureToplevel(const QString& appId, const QString& title, bool paintCursor, int fps);
     void stop();
 
+    QImage grabOutput(const QString& outputName, bool paintCursor, int timeoutMs = 2000);
+    QImage grabToplevel(const QString& appId, const QString& title, bool paintCursor, int timeoutMs = 2000);
+
     QSize frameSize() const { return m_frameSize; }
 
 signals:
@@ -60,8 +64,14 @@ private:
     bool connectDisplay();
     void disconnectDisplay();
     void releaseNotifier();
-    bool beginSession(ext_image_capture_source_v1* source, bool paintCursor, int fps);
+    bool beginSession(ext_image_capture_source_v1* source, bool paintCursor, int fps, bool live);
     void endSession();
+
+    bool waitFor(const std::function<bool()>& predicate, int timeoutMs);
+    QImage grabOnce(int timeoutMs);
+
+    wl_output* findOutput(const QString& name) const;
+    ext_foreign_toplevel_handle_v1* findToplevel(const QString& appId, const QString& title);
 
     bool allocateBuffer();
     void releaseBuffer();
@@ -115,6 +125,7 @@ private:
     size_t m_dataSize = 0;
     int m_poolFd = -1;
 
+    QImage m_grabbed;
     QSize m_bufferSize;
     QSize m_frameSize;
     uint32_t m_shmFormat = 0;
@@ -123,6 +134,8 @@ private:
     bool m_constraintsDone = false;
     bool m_bufferValid = false;
     bool m_capturePending = false;
+    bool m_live = false;
+    bool m_grabDone = false;
     int m_frameIntervalMs = 16;
     qint64 m_lastCaptureMs = 0;
 };

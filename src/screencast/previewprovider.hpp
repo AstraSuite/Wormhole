@@ -1,67 +1,61 @@
 #pragma once
 
-#include <QBuffer>
 #include <QCache>
-#include <QDateTime>
-#include <QDebug>
+#include <QColor>
 #include <QImage>
-#include <QImageReader>
-#include <QProcess>
+#include <QMutex>
+#include <QMutexLocker>
 #include <QQuickImageProvider>
+
+#include "waylandcapture.hpp"
 
 namespace wormhole::screencast {
 
 class ScreenPreviewProvider : public QQuickImageProvider {
 public:
+    static constexpr int kMaxPreviewWidth = 1280;
+
     ScreenPreviewProvider()
         : QQuickImageProvider(QQuickImageProvider::Image) {
         m_cache.setMaxCost(10);
     }
 
     QImage requestImage(const QString& id, QSize* size, const QSize& requestedSize) override {
-        QString cleanId = id;
-        int qIdx = cleanId.indexOf(QLatin1Char('?'));
-        if (qIdx != -1) {
-            cleanId = cleanId.left(qIdx);
-        }
+        const QString outputName = id.section(QLatin1Char('?'), 0, 0);
 
-        if (m_cache.contains(cleanId)) {
-            QImage* cached = m_cache.object(cleanId);
-            if (cached && !cached->isNull()) {
-                if (size) *size = cached->size();
-                return *cached;
-            }
-        }
-
-        int targetW = requestedSize.width() > 0 ? requestedSize.width() : 1280;
-        int targetH = requestedSize.height() > 0 ? requestedSize.height() : 720;
-
-        QProcess proc;
-        QStringList args;
-        // Fast, high-resolution uncompressed snapshot via ppm
-        args << QStringLiteral("-t") << QStringLiteral("ppm")
-             << QStringLiteral("-s") << QStringLiteral("0.75")
-             << QStringLiteral("-o") << cleanId
-             << QStringLiteral("-");
-
-        proc.start(QStringLiteral("grim"), args);
-        if (proc.waitForFinished(1000)) {
-            QByteArray data = proc.readAllStandardOutput();
-            if (!data.isEmpty()) {
-                QBuffer buf(&data);
-                buf.open(QIODevice::ReadOnly);
-                QImageReader reader(&buf, "ppm");
-                QImage img = reader.read();
-                if (!img.isNull()) {
-                    if (size) *size = img.size();
-                    m_cache.insert(cleanId, new QImage(img));
-                    return img;
+        {
+            QMutexLocker locker(&m_mutex);
+            if (const QImage* cached = m_cache.object(outputName)) {
+                if (!cached->isNull()) {
+                    if (size) *size = cached->size();
+                    return *cached;
                 }
             }
         }
 
-        // Fallback placeholder image
-        QImage fallback(targetW, targetH, QImage::Format_ARGB32_Premultiplied);
+        QImage frame;
+        {
+            QMutexLocker locker(&m_mutex);
+            WaylandCapture capture;
+            frame = capture.grabOutput(outputName, false);
+        }
+
+        if (!frame.isNull()) {
+            if (requestedSize.width() > 0 && requestedSize.height() > 0) {
+                frame = frame.scaled(requestedSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+            } else if (frame.width() > kMaxPreviewWidth) {
+                frame = frame.scaledToWidth(kMaxPreviewWidth, Qt::SmoothTransformation);
+            }
+            if (size) *size = frame.size();
+
+            QMutexLocker locker(&m_mutex);
+            m_cache.insert(outputName, new QImage(frame));
+            return frame;
+        }
+
+        const int fallbackWidth = requestedSize.width() > 0 ? requestedSize.width() : 1280;
+        const int fallbackHeight = requestedSize.height() > 0 ? requestedSize.height() : 720;
+        QImage fallback(fallbackWidth, fallbackHeight, QImage::Format_ARGB32_Premultiplied);
         fallback.fill(QColor(19, 27, 26));
         if (size) *size = fallback.size();
         return fallback;
@@ -69,6 +63,7 @@ public:
 
 private:
     QCache<QString, QImage> m_cache;
+    QMutex m_mutex;
 };
 
 } // namespace wormhole::screencast
