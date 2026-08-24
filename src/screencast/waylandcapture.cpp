@@ -6,7 +6,9 @@
 #include <QTimer>
 #include <QTransform>
 
+#include <cerrno>
 #include <cstring>
+#include <poll.h>
 #include <sys/mman.h>
 #include <unistd.h>
 #include <wayland-client.h>
@@ -355,28 +357,48 @@ void WaylandCapture::disconnectDisplay() {
     }
 }
 
+wl_output* WaylandCapture::findOutput(const QString& name) const {
+    for (const auto& entry : m_outputs) {
+        if (entry.name == name) {
+            return entry.output;
+        }
+    }
+    if (m_outputs.size() == 1) {
+        return m_outputs.first().output;
+    }
+    return nullptr;
+}
+
+ext_foreign_toplevel_handle_v1* WaylandCapture::findToplevel(const QString& appId, const QString& title) {
+    wl_display_roundtrip(m_display);
+    wl_display_roundtrip(m_display);
+
+    for (const auto& entry : m_toplevels) {
+        if (!entry.closed && entry.appId == appId && entry.title == title) {
+            return entry.handle;
+        }
+    }
+    for (const auto& entry : m_toplevels) {
+        if (!entry.closed && entry.appId == appId) {
+            return entry.handle;
+        }
+    }
+    return nullptr;
+}
+
 bool WaylandCapture::captureOutput(const QString& outputName, bool paintCursor, int fps) {
     if (!connectDisplay() || !m_captureManager || !m_outputSources || !m_shm) {
         return false;
     }
 
-    wl_output* target = nullptr;
-    for (const auto& entry : m_outputs) {
-        if (entry.name == outputName) {
-            target = entry.output;
-            break;
-        }
-    }
-    if (!target && m_outputs.size() == 1) {
-        target = m_outputs.first().output;
-    }
+    wl_output* target = findOutput(outputName);
     if (!target) {
         qWarning() << "Wormhole: output not found for capture:" << outputName;
         return false;
     }
 
     auto* source = ext_output_image_capture_source_manager_v1_create_source(m_outputSources, target);
-    return beginSession(source, paintCursor, fps);
+    return beginSession(source, paintCursor, fps, true);
 }
 
 bool WaylandCapture::captureToplevel(const QString& appId, const QString& title, bool paintCursor, int fps) {
@@ -384,34 +406,121 @@ bool WaylandCapture::captureToplevel(const QString& appId, const QString& title,
         return false;
     }
 
-    wl_display_roundtrip(m_display);
-    wl_display_roundtrip(m_display);
-
-    ext_foreign_toplevel_handle_v1* target = nullptr;
-    for (const auto& entry : m_toplevels) {
-        if (!entry.closed && entry.appId == appId && entry.title == title) {
-            target = entry.handle;
-            break;
-        }
-    }
-    if (!target) {
-        for (const auto& entry : m_toplevels) {
-            if (!entry.closed && entry.appId == appId) {
-                target = entry.handle;
-                break;
-            }
-        }
-    }
+    ext_foreign_toplevel_handle_v1* target = findToplevel(appId, title);
     if (!target) {
         qWarning() << "Wormhole: toplevel not found for capture:" << appId << title;
         return false;
     }
 
     auto* source = ext_foreign_toplevel_image_capture_source_manager_v1_create_source(m_toplevelSources, target);
-    return beginSession(source, paintCursor, fps);
+    return beginSession(source, paintCursor, fps, true);
 }
 
-bool WaylandCapture::beginSession(ext_image_capture_source_v1* source, bool paintCursor, int fps) {
+QImage WaylandCapture::grabOutput(const QString& outputName, bool paintCursor, int timeoutMs) {
+    endSession();
+
+    if (!connectDisplay() || !m_captureManager || !m_outputSources || !m_shm) {
+        return {};
+    }
+
+    wl_output* target = findOutput(outputName);
+    if (!target) {
+        return {};
+    }
+
+    auto* source = ext_output_image_capture_source_manager_v1_create_source(m_outputSources, target);
+    if (!beginSession(source, paintCursor, 0, false)) {
+        return {};
+    }
+
+    const QImage image = grabOnce(timeoutMs);
+    endSession();
+    return image;
+}
+
+QImage WaylandCapture::grabToplevel(const QString& appId, const QString& title, bool paintCursor, int timeoutMs) {
+    endSession();
+
+    if (!connectDisplay() || !m_captureManager || !m_toplevelSources || !m_shm || !m_toplevelList) {
+        return {};
+    }
+
+    ext_foreign_toplevel_handle_v1* target = findToplevel(appId, title);
+    if (!target) {
+        return {};
+    }
+
+    auto* source = ext_foreign_toplevel_image_capture_source_manager_v1_create_source(m_toplevelSources, target);
+    if (!beginSession(source, paintCursor, 0, false)) {
+        return {};
+    }
+
+    const QImage image = grabOnce(timeoutMs);
+    endSession();
+    return image;
+}
+
+QImage WaylandCapture::grabOnce(int timeoutMs) {
+    if (!m_session || !m_bufferValid) {
+        return {};
+    }
+
+    m_grabbed = QImage();
+    m_grabDone = false;
+    requestFrame();
+
+    waitFor([this]() { return m_grabDone; }, timeoutMs);
+    return m_grabbed;
+}
+
+bool WaylandCapture::waitFor(const std::function<bool()>& predicate, int timeoutMs) {
+    if (!m_display) {
+        return false;
+    }
+
+    const qint64 deadline = QDateTime::currentMSecsSinceEpoch() + timeoutMs;
+
+    while (!predicate()) {
+        while (wl_display_prepare_read(m_display) != 0) {
+            if (wl_display_dispatch_pending(m_display) < 0) {
+                return false;
+            }
+        }
+
+        if (predicate()) {
+            wl_display_cancel_read(m_display);
+            return true;
+        }
+
+        if (wl_display_flush(m_display) < 0 && errno != EAGAIN) {
+            wl_display_cancel_read(m_display);
+            return false;
+        }
+
+        const qint64 remaining = deadline - QDateTime::currentMSecsSinceEpoch();
+        if (remaining <= 0) {
+            wl_display_cancel_read(m_display);
+            return false;
+        }
+
+        pollfd pfd{ wl_display_get_fd(m_display), POLLIN, 0 };
+        if (poll(&pfd, 1, static_cast<int>(remaining)) <= 0) {
+            wl_display_cancel_read(m_display);
+            return false;
+        }
+
+        if (wl_display_read_events(m_display) < 0) {
+            return false;
+        }
+        if (wl_display_dispatch_pending(m_display) < 0) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool WaylandCapture::beginSession(ext_image_capture_source_v1* source, bool paintCursor, int fps, bool live) {
     if (!source) {
         return false;
     }
@@ -427,6 +536,7 @@ bool WaylandCapture::beginSession(ext_image_capture_source_v1* source, bool pain
 
     m_frameIntervalMs = fps > 0 ? qBound(1, 1000 / fps, 1000) : 16;
     m_source = source;
+    m_live = live;
     m_constraintsDone = false;
     m_bufferValid = false;
     m_haveFormat = false;
@@ -435,16 +545,15 @@ bool WaylandCapture::beginSession(ext_image_capture_source_v1* source, bool pain
     m_session = ext_image_copy_capture_manager_v1_create_session(m_captureManager, m_source, options);
     ext_image_copy_capture_session_v1_add_listener(m_session, &listener, this);
 
-    const qint64 deadline = QDateTime::currentMSecsSinceEpoch() + kSetupTimeoutMs;
-    while (!m_constraintsDone && QDateTime::currentMSecsSinceEpoch() < deadline) {
-        if (wl_display_roundtrip(m_display) < 0) {
-            break;
-        }
-    }
+    waitFor([this]() { return m_constraintsDone; }, kSetupTimeoutMs);
 
     if (!m_constraintsDone || !m_bufferValid) {
         endSession();
         return false;
+    }
+
+    if (!m_live) {
+        return true;
     }
 
     m_notifier = new QSocketNotifier(wl_display_get_fd(m_display), QSocketNotifier::Read, this);
@@ -471,7 +580,7 @@ void WaylandCapture::onConstraintsDone() {
         emit frameSizeChanged(m_frameSize);
     }
 
-    if (m_notifier && !m_frame && !m_capturePending) {
+    if (m_live && m_notifier && !m_frame && !m_capturePending) {
         scheduleFrame();
     }
 }
@@ -606,14 +715,23 @@ void WaylandCapture::onFrameReady() {
             m_frameSize = logical;
             emit frameSizeChanged(m_frameSize);
         }
-        emit frameReady(image);
+        if (m_live) {
+            emit frameReady(image);
+        } else {
+            m_grabbed = image.copy();
+        }
     }
 
-    scheduleFrame();
+    m_grabDone = true;
+
+    if (m_live) {
+        scheduleFrame();
+    }
 }
 
 void WaylandCapture::onFrameFailed(uint32_t reason) {
     destroyFrame();
+    m_grabDone = true;
 
     if (reason == EXT_IMAGE_COPY_CAPTURE_FRAME_V1_FAILURE_REASON_STOPPED) {
         onSessionStopped();
@@ -625,7 +743,9 @@ void WaylandCapture::onFrameFailed(uint32_t reason) {
         return;
     }
 
-    scheduleFrame();
+    if (m_live) {
+        scheduleFrame();
+    }
 }
 
 void WaylandCapture::onSessionStopped() {
@@ -677,6 +797,7 @@ void WaylandCapture::endSession() {
 
     m_constraintsDone = false;
     m_capturePending = false;
+    m_live = false;
 
     if (m_display) {
         wl_display_flush(m_display);

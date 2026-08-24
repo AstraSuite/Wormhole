@@ -1,7 +1,6 @@
 #include "livescreenitem.hpp"
-#include <QDebug>
-#include <QGuiApplication>
-#include <QScreen>
+
+#include <QColor>
 
 namespace wormhole::screencast {
 
@@ -10,131 +9,116 @@ LiveScreenItem::LiveScreenItem(QQuickItem* parent)
     setOpaquePainting(false);
     setRenderTarget(QQuickPaintedItem::FramebufferObject);
     setPerformanceHint(QQuickPaintedItem::FastFBOResizing, true);
-
-    m_timer = new QTimer(this);
-    connect(m_timer, &QTimer::timeout, this, &LiveScreenItem::grabFrame);
-
-    m_process = new QProcess(this);
-    connect(m_process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
-            this, [this](int exitCode, QProcess::ExitStatus /*status*/) {
-        m_busy = false;
-        if (exitCode == 0 && m_process) {
-            QByteArray data = m_process->readAllStandardOutput();
-            if (!data.isEmpty()) {
-                QBuffer buf(&data);
-                buf.open(QIODevice::ReadOnly);
-                QImageReader reader(&buf, "ppm");
-                QImage img = reader.read();
-                if (!img.isNull()) {
-                    m_currentFrame = img;
-                    update();
-                }
-            }
-        }
-    });
-
-    updateTimerState();
 }
 
 LiveScreenItem::~LiveScreenItem() {
-    if (m_timer && m_timer->isActive()) {
-        m_timer->stop();
-    }
-    if (m_process && m_process->state() != QProcess::NotRunning) {
-        m_process->kill();
-    }
+    stopCapture();
 }
 
-void LiveScreenItem::setTarget(const QString& t) {
-    if (m_target != t) {
-        m_target = t;
+void LiveScreenItem::setTarget(const QString& target) {
+    if (m_target != target) {
+        m_target = target;
         emit targetChanged();
-        grabFrame();
+        restart();
     }
 }
 
-void LiveScreenItem::setLive(bool l) {
-    if (m_live != l) {
-        m_live = l;
+void LiveScreenItem::setLive(bool live) {
+    if (m_live != live) {
+        m_live = live;
         emit liveChanged();
-        updateTimerState();
+        restart();
     }
 }
 
-void LiveScreenItem::setFps(int f) {
-    if (m_fps != f) {
-        m_fps = qBound(1, f, 60);
+void LiveScreenItem::setFps(int fps) {
+    const int bounded = qBound(1, fps, 60);
+    if (m_fps != bounded) {
+        m_fps = bounded;
         emit fpsChanged();
-        updateTimerState();
+        restart();
     }
 }
 
-void LiveScreenItem::setRadius(qreal r) {
-    if (!qFuzzyCompare(m_radius, r)) {
-        m_radius = r;
+void LiveScreenItem::setRadius(qreal radius) {
+    if (!qFuzzyCompare(m_radius, radius)) {
+        m_radius = radius;
         emit radiusChanged();
         update();
     }
 }
 
-void LiveScreenItem::setIsWindow(bool w) {
-    if (m_isWindow != w) {
-        m_isWindow = w;
+void LiveScreenItem::setIsWindow(bool isWindow) {
+    if (m_isWindow != isWindow) {
+        m_isWindow = isWindow;
         emit isWindowChanged();
+        restart();
     }
 }
 
-void LiveScreenItem::setWindowGeometry(const QString& g) {
-    if (m_windowGeometry != g) {
-        m_windowGeometry = g;
-        emit windowGeometryChanged();
+void LiveScreenItem::setAppId(const QString& appId) {
+    if (m_appId != appId) {
+        m_appId = appId;
+        emit appIdChanged();
+        restart();
     }
 }
 
-void LiveScreenItem::updateTimerState() {
-    if (m_live && isVisible() && !m_target.isEmpty()) {
-        int interval = 1000 / m_fps;
-        if (m_timer->interval() != interval || !m_timer->isActive()) {
-            m_timer->start(interval);
-        }
-    } else {
-        m_timer->stop();
+void LiveScreenItem::setTitle(const QString& title) {
+    if (m_title != title) {
+        m_title = title;
+        emit titleChanged();
+        restart();
+    }
+}
+
+void LiveScreenItem::setIncludeCursor(bool includeCursor) {
+    if (m_includeCursor != includeCursor) {
+        m_includeCursor = includeCursor;
+        emit includeCursorChanged();
+        restart();
     }
 }
 
 void LiveScreenItem::itemChange(ItemChange change, const ItemChangeData& value) {
     QQuickPaintedItem::itemChange(change, value);
     if (change == ItemVisibleHasChanged) {
-        updateTimerState();
-        if (isVisible()) {
-            grabFrame();
-        }
+        restart();
     }
 }
 
-void LiveScreenItem::grabFrame() {
-    if (!m_live || !isVisible() || m_target.isEmpty() || m_busy) {
+void LiveScreenItem::stopCapture() {
+    if (m_capture) {
+        m_capture->stop();
+        m_capture->deleteLater();
+        m_capture = nullptr;
+    }
+}
+
+void LiveScreenItem::restart() {
+    stopCapture();
+
+    const bool wanted = m_live && isVisible() && (m_isWindow ? !m_appId.isEmpty() : !m_target.isEmpty());
+    if (!wanted) {
         return;
     }
 
-    if (m_process->state() != QProcess::NotRunning) {
-        return;
+    m_capture = new WaylandCapture(this);
+    connect(m_capture, &WaylandCapture::frameReady, this, &LiveScreenItem::onFrame);
+    connect(m_capture, &WaylandCapture::stopped, this, &LiveScreenItem::stopCapture);
+
+    const bool started = m_isWindow
+        ? m_capture->captureToplevel(m_appId, m_title, m_includeCursor, m_fps)
+        : m_capture->captureOutput(m_target, m_includeCursor, m_fps);
+
+    if (!started) {
+        stopCapture();
     }
+}
 
-    m_busy = true;
-
-    QStringList args;
-    args << QStringLiteral("-t") << QStringLiteral("ppm")
-         << QStringLiteral("-s") << QStringLiteral("0.75");
-
-    if (m_isWindow && !m_windowGeometry.isEmpty()) {
-        args << QStringLiteral("-g") << m_windowGeometry;
-    } else {
-        args << QStringLiteral("-o") << m_target;
-    }
-    args << QStringLiteral("-");
-
-    m_process->start(QStringLiteral("grim"), args);
+void LiveScreenItem::onFrame(const QImage& frame) {
+    m_currentFrame = frame.copy();
+    update();
 }
 
 void LiveScreenItem::paint(QPainter* painter) {
