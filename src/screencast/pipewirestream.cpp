@@ -1,8 +1,6 @@
 #include "pipewirestream.hpp"
 #include <QCoreApplication>
 #include <QDebug>
-#include <sys/mman.h>
-#include <sys/socket.h>
 #include <unistd.h>
 #include <time.h>
 
@@ -234,12 +232,10 @@ uint32_t PipeWireStreamManager::createStream(const QString& title, int width, in
     spa_pod_builder_push_object(&b, &f, SPA_TYPE_OBJECT_Format, SPA_PARAM_EnumFormat);
     spa_pod_builder_add(&b, SPA_FORMAT_mediaType, SPA_POD_Id(SPA_MEDIA_TYPE_video), 0);
     spa_pod_builder_add(&b, SPA_FORMAT_mediaSubtype, SPA_POD_Id(SPA_MEDIA_SUBTYPE_raw), 0);
-    spa_pod_builder_add(&b, SPA_FORMAT_VIDEO_format, SPA_POD_CHOICE_ENUM_Id(5,
+    spa_pod_builder_add(&b, SPA_FORMAT_VIDEO_format, SPA_POD_CHOICE_ENUM_Id(3,
         SPA_VIDEO_FORMAT_BGRx,
         SPA_VIDEO_FORMAT_BGRx,
-        SPA_VIDEO_FORMAT_BGRA,
-        SPA_VIDEO_FORMAT_RGBx,
-        SPA_VIDEO_FORMAT_RGBA
+        SPA_VIDEO_FORMAT_BGRA
     ), 0);
     struct spa_rectangle rect = SPA_RECTANGLE(static_cast<uint32_t>(ctx->width), static_cast<uint32_t>(ctx->height));
     struct spa_fraction framerate = SPA_FRACTION(0, 1);
@@ -260,7 +256,7 @@ uint32_t PipeWireStreamManager::createStream(const QString& title, int width, in
     int res = pw_stream_connect(stream,
                                 PW_DIRECTION_OUTPUT,
                                 PW_ID_ANY,
-                                static_cast<enum pw_stream_flags>(PW_STREAM_FLAG_DRIVER | PW_STREAM_FLAG_MAP_BUFFERS | PW_STREAM_FLAG_ALLOC_BUFFERS),
+                                static_cast<enum pw_stream_flags>(PW_STREAM_FLAG_DRIVER | PW_STREAM_FLAG_MAP_BUFFERS),
                                 params, 1);
 
     if (res < 0) {
@@ -271,7 +267,6 @@ uint32_t PipeWireStreamManager::createStream(const QString& title, int width, in
         return 0;
     }
 
-    // Wait until node ID is assigned
     int attempts = 0;
     while (attempts++ < 50) {
         uint32_t nid = pw_stream_get_node_id(stream);
@@ -279,7 +274,9 @@ uint32_t PipeWireStreamManager::createStream(const QString& title, int width, in
             ctx->nodeId = nid;
             break;
         }
-        pw_thread_loop_wait(m_loop);
+        if (pw_thread_loop_timed_wait(m_loop, 1) != 0) {
+            break;
+        }
     }
 
     uint32_t nodeId = ctx->nodeId;
@@ -344,22 +341,10 @@ void PipeWireStreamManager::pushFrame(uint32_t nodeId, const QImage& frame) {
         return;
     }
 
-    uint32_t expectedSize = static_cast<uint32_t>(ctx->width * 4 * ctx->height);
+    const uint32_t requiredSize = static_cast<uint32_t>(ctx->width * 4 * ctx->height);
     uint8_t* dst = static_cast<uint8_t*>(buf->datas[0].data);
-    if (!dst || dst == MAP_FAILED || (uintptr_t)dst == (uintptr_t)-1 || (uintptr_t)dst == 0xffffffff) {
-        if (buf->datas[0].type == SPA_DATA_MemFd && buf->datas[0].fd >= 0) {
-            size_t mapSize = buf->datas[0].maxsize > 0 ? buf->datas[0].maxsize : expectedSize;
-            dst = static_cast<uint8_t*>(mmap(nullptr, mapSize, PROT_READ | PROT_WRITE, MAP_SHARED, buf->datas[0].fd, buf->datas[0].mapoffset));
-            if (dst != MAP_FAILED) {
-                buf->datas[0].data = dst;
-                buf->datas[0].maxsize = mapSize;
-            } else {
-                dst = nullptr;
-            }
-        }
-    }
-
-    if (!dst || dst == MAP_FAILED || (uintptr_t)dst == (uintptr_t)-1 || (uintptr_t)dst == 0xffffffff) {
+    if (!dst || buf->datas[0].maxsize < requiredSize) {
+        buf->datas[0].chunk->size = 0;
         pw_stream_queue_buffer(ctx->stream, b);
         pw_thread_loop_unlock(m_loop);
         return;
@@ -389,7 +374,6 @@ void PipeWireStreamManager::pushFrame(uint32_t nodeId, const QImage& frame) {
     buf->datas[0].chunk->size = dstStride * ctx->height;
     buf->datas[0].chunk->stride = dstStride;
 
-    // Attach SPA_META_Header timestamp
     struct spa_meta_header* h = static_cast<struct spa_meta_header*>(
         spa_buffer_find_meta_data(buf, SPA_META_Header, sizeof(*h))
     );
@@ -418,28 +402,24 @@ void PipeWireStreamManager::pushFrame(uint32_t nodeId, const QImage& frame) {
     }
 
     pw_stream_queue_buffer(ctx->stream, b);
+    if (pw_stream_is_driving(ctx->stream)) {
+        pw_stream_trigger_process(ctx->stream);
+    }
     pw_thread_loop_unlock(m_loop);
 }
 
 int PipeWireStreamManager::getRemoteFd() {
-    if (!m_initialized || !m_context || !m_loop) return -1;
-
-    int fds[2];
-    if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC | SOCK_NONBLOCK, 0, fds) < 0) {
-        return -1;
-    }
+    if (!initialize()) return -1;
 
     pw_thread_loop_lock(m_loop);
-    pw_core* core = pw_context_connect_fd(m_context, fds[0], nullptr, 0);
+    pw_core* core = pw_context_connect(m_context, nullptr, 0);
+    int fd = core ? pw_core_steal_fd(core) : -1;
+    if (core) {
+        pw_core_disconnect(core);
+    }
     pw_thread_loop_unlock(m_loop);
 
-    if (!core) {
-        close(fds[0]);
-        close(fds[1]);
-        return -1;
-    }
-
-    return fds[1];
+    return fd;
 }
 
 } // namespace wormhole::screencast
