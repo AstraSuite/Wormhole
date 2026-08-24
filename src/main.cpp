@@ -88,6 +88,7 @@ int main(int argc, char* argv[]) {
     QCommandLineOption titleOpt("title", "Dialog title", "title");
     QCommandLineOption appIdOpt("app-id", "Calling application ID", "appId");
     QCommandLineOption parentWinOpt("parent-window", "Parent window handle", "parent");
+    QCommandLineOption cursorModeOpt("cursor-mode", "Cursor mode requested by the caller", "mode");
     QCommandLineOption urlOpt("url", "Target URL / URI", "url");
     QCommandLineOption nameOpt("name", "Name for shortcut / launcher", "name");
     QCommandLineOption execOpt("exec", "Exec command for launcher", "exec");
@@ -110,6 +111,7 @@ int main(int argc, char* argv[]) {
     parser.addOption(titleOpt);
     parser.addOption(appIdOpt);
     parser.addOption(parentWinOpt);
+    parser.addOption(cursorModeOpt);
     parser.addOption(urlOpt);
     parser.addOption(nameOpt);
     parser.addOption(execOpt);
@@ -159,6 +161,7 @@ int main(int argc, char* argv[]) {
     if (parser.isSet(titleOpt)) controller->setTitle(parser.value(titleOpt));
     if (parser.isSet(appIdOpt)) controller->setAppId(parser.value(appIdOpt));
     if (parser.isSet(parentWinOpt)) controller->setParentWindow(parser.value(parentWinOpt));
+    if (parser.isSet(cursorModeOpt)) controller->setCursorMode(parser.value(cursorModeOpt).toUInt());
     if (parser.isSet(urlOpt)) {
         controller->setWallpaperUri(parser.value(urlOpt));
     }

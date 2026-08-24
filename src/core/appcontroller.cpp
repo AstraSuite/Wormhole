@@ -54,6 +54,13 @@ void AppController::setAvailableCursorModes(uint modes) {
     }
 }
 
+void AppController::setCursorMode(uint mode) {
+    if (m_cursorMode != mode) {
+        m_cursorMode = mode;
+        emit cursorModeChanged();
+    }
+}
+
 void AppController::setAllowToken(bool allow) {
     if (m_allowToken != allow) {
         m_allowToken = allow;

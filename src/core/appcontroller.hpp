@@ -26,6 +26,7 @@ class AppController : public QObject {
     // ScreenCast Specific
     Q_PROPERTY(uint availableSourceTypes READ availableSourceTypes WRITE setAvailableSourceTypes NOTIFY availableSourceTypesChanged)
     Q_PROPERTY(uint availableCursorModes READ availableCursorModes WRITE setAvailableCursorModes NOTIFY availableCursorModesChanged)
+    Q_PROPERTY(uint cursorMode READ cursorMode WRITE setCursorMode NOTIFY cursorModeChanged)
     Q_PROPERTY(bool allowToken READ allowToken WRITE setAllowToken NOTIFY allowTokenChanged)
     Q_PROPERTY(bool multipleSources READ multipleSources WRITE setMultipleSources NOTIFY multipleSourcesChanged)
 
@@ -90,6 +91,9 @@ public:
     uint availableCursorModes() const { return m_availableCursorModes; }
     void setAvailableCursorModes(uint modes);
 
+    uint cursorMode() const { return m_cursorMode; }
+    void setCursorMode(uint mode);
+
     bool allowToken() const { return m_allowToken; }
     void setAllowToken(bool allow);
 
@@ -152,6 +156,7 @@ signals:
     void parentWindowChanged();
     void availableSourceTypesChanged();
     void availableCursorModesChanged();
+    void cursorModeChanged();
     void allowTokenChanged();
     void multipleSourcesChanged();
     void isScreenshotInteractiveChanged();
@@ -183,6 +188,7 @@ private:
 
     uint m_availableSourceTypes = 7; // Monitor | Window | Virtual
     uint m_availableCursorModes = 7; // Hidden | Embedded | Metadata
+    uint m_cursorMode = 1;
     bool m_allowToken = true;
     bool m_multipleSources = false;
 

@@ -112,7 +112,7 @@ public:
 
     uint version() const { return 5; }
     uint AvailableSourceTypes() const { return Monitor | Window | Virtual; }
-    uint AvailableCursorModes() const { return Hidden | Embedded | Metadata; }
+    uint AvailableCursorModes() const { return Hidden | Embedded; }
 
 public slots:
     Q_SCRIPTABLE uint CreateSession(const QDBusObjectPath& handle,
