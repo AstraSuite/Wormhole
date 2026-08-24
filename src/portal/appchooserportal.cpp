@@ -8,7 +8,7 @@
 namespace wormhole::portal {
 
 AppChooserPortal::AppChooserPortal(QObject* parent)
-    : QObject(parent) {
+    : QDBusAbstractAdaptor(parent) {
 }
 
 void AppChooserPortal::ChooseApplication(const QDBusObjectPath& handle,

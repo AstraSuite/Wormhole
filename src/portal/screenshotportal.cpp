@@ -12,7 +12,7 @@
 namespace wormhole::portal {
 
 ScreenshotPortal::ScreenshotPortal(QObject* parent)
-    : QObject(parent) {
+    : QDBusAbstractAdaptor(parent) {
 }
 
 void ScreenshotPortal::Screenshot(const QDBusObjectPath& handle,
