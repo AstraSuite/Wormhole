@@ -165,6 +165,7 @@ StyledRect {
                                 required property string makeModel
                                 required property string resolution
                                 required property string refreshRate
+                                required property real refreshRateHz
                                 required property bool focused
                                 required property string activeWorkspace
                                 required property int posX
@@ -300,7 +301,10 @@ StyledRect {
                                                 makeModel: monitorItem.makeModel,
                                                 resolution: monitorItem.resolution,
                                                 refreshRate: monitorItem.refreshRate,
-                                                activeWorkspace: monitorItem.activeWorkspace
+                                                activeWorkspace: monitorItem.activeWorkspace,
+                                                x: monitorItem.posX,
+                                                y: monitorItem.posY,
+                                                fps: Math.max(1, Math.round(monitorItem.refreshRateHz))
                                             };
                                             screensModel.focusScreen(monitorItem.name);
                                         }

@@ -15,7 +15,7 @@
 #include "request.hpp"
 #include "session.hpp"
 #include "../screencast/pipewirestream.hpp"
-#include "../screencast/screencopy.hpp"
+#include "../screencast/waylandcapture.hpp"
 
 namespace wormhole::portal {
 
@@ -142,7 +142,7 @@ private:
         uint persistMode = NoPersist;
         QString restoreToken;
         uint32_t pipewireNodeId = 0;
-        screencast::ScreenCaptureWorker* worker = nullptr;
+        screencast::WaylandCapture* capture = nullptr;
     };
 
     struct PendingStartRequest {
@@ -152,6 +152,8 @@ private:
         QProcess* process = nullptr;
         PortalRequest* requestObject = nullptr;
     };
+
+    void closeSession(const QString& sessionPath);
 
     void launchScreenChooser(const QDBusObjectPath& handle,
                              const QDBusObjectPath& sessionHandle,

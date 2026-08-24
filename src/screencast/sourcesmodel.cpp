@@ -73,6 +73,8 @@ QVariant ScreensModel::data(const QModelIndex& index, int role) const {
         return QStringLiteral("%1 × %2").arg(m.effectiveWidth()).arg(m.effectiveHeight());
     case RefreshRateRole:
         return QStringLiteral("%1 Hz").arg(QString::number(m.refreshRate, 'f', 0));
+    case RefreshRateHzRole:
+        return m.refreshRate;
     case ScaleRole:
         return m.scale;
     case FocusedRole:
@@ -108,6 +110,7 @@ QHash<int, QByteArray> ScreensModel::roleNames() const {
     roles[MakeModelRole] = "makeModel";
     roles[ResolutionRole] = "resolution";
     roles[RefreshRateRole] = "refreshRate";
+    roles[RefreshRateHzRole] = "refreshRateHz";
     roles[ScaleRole] = "scale";
     roles[FocusedRole] = "focused";
     roles[ActiveWorkspaceRole] = "activeWorkspace";
