@@ -61,6 +61,32 @@ sudo cmake --install build
 
 ## Usage
 
+### Selecting Wormhole as the portal backend
+
+`xdg-desktop-portal` picks a backend per interface. Most wlroots backends ship
+their own preference file in `/usr/share/xdg-desktop-portal`, for example
+`hyprland-portals.conf` from `xdg-desktop-portal-hyprland`, and a file matching
+`$XDG_CURRENT_DESKTOP` wins over the `UseIn` line in `wormhole.portal`. So on a
+Hyprland or Sway session with one of those backends installed, Wormhole is not
+used until it is asked for explicitly:
+
+```bash
+mkdir -p ~/.config/xdg-desktop-portal
+cp /usr/share/xdg-desktop-portal/wormhole-portals.conf ~/.config/xdg-desktop-portal/portals.conf
+systemctl --user restart xdg-desktop-portal.service
+```
+
+To hand only screen sharing to Wormhole and leave the rest alone:
+
+```ini
+[preferred]
+default=hyprland;gtk
+org.freedesktop.impl.portal.ScreenCast=wormhole
+```
+
+`/usr/share/xdg-desktop-portal/portals` must contain `wormhole.portal` for any
+of this to resolve.
+
 ### Run as D-Bus Portal Daemon
 ```bash
 wormhole --daemon

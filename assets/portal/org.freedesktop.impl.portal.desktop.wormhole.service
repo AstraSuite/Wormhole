@@ -1,3 +1,0 @@
-[D-BUS Service]
-Name=org.freedesktop.impl.portal.desktop.wormhole
-Exec=/usr/bin/wormhole --daemon

@@ -38,6 +38,8 @@ bool PortalDaemon::start() {
 
     m_fileChooser = new FileChooserPortal(this);
     m_screenCast = new ScreenCastPortal(this);
+    m_screenshot = new ScreenshotPortal(this);
+    m_appChooser = new AppChooserPortal(this);
     m_access = new AccessPortal(this);
     m_account = new AccountPortal(this);
     m_dynamicLauncher = new DynamicLauncherPortal(this);

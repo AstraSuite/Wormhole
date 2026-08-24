@@ -248,19 +248,28 @@ install(FILES assets/portal/wormhole.portal
     DESTINATION ${CMAKE_INSTALL_DATADIR}/xdg-desktop-portal/portals
 )
 
-install(FILES assets/portal/org.freedesktop.impl.portal.desktop.wormhole.service
+set(WORMHOLE_BIN "${CMAKE_INSTALL_FULL_BINDIR}/wormhole")
+
+configure_file(
+    assets/portal/org.freedesktop.impl.portal.desktop.wormhole.service.in
+    "${CMAKE_CURRENT_BINARY_DIR}/org.freedesktop.impl.portal.desktop.wormhole.service"
+    @ONLY
+)
+
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/org.freedesktop.impl.portal.desktop.wormhole.service"
     DESTINATION ${CMAKE_INSTALL_DATADIR}/dbus-1/services
 )
 
 install(FILES assets/portal/portals.conf
-    DESTINATION ${CMAKE_INSTALL_DATADIR}/wormhole/portal
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/xdg-desktop-portal
+    RENAME wormhole-portals.conf
 )
 
 # Create symlink xdg-desktop-portal-wormhole -> wormhole
 install(CODE "
     execute_process(COMMAND \${CMAKE_COMMAND} -E create_symlink
         wormhole
-        \"\$ENV{DESTDIR}\${CMAKE_INSTALL_FULL_BINDIR}/xdg-desktop-portal-wormhole\"
+        \"\$ENV{DESTDIR}${CMAKE_INSTALL_FULL_BINDIR}/xdg-desktop-portal-wormhole\"
     )
 ")
 
@@ -268,28 +277,40 @@ install(CODE "
 set(INIT_SYSTEM "auto" CACHE STRING "Init system to install service files for (auto, openrc, systemd, none)")
 
 if(INIT_SYSTEM STREQUAL "auto")
-    if(EXISTS "/etc/init.d" OR EXISTS "/sbin/openrc" OR EXISTS "/usr/bin/openrc" OR EXISTS "/run/openrc")
+    if(EXISTS "/sbin/openrc" OR EXISTS "/usr/bin/openrc" OR EXISTS "/run/openrc")
         set(DETECTED_INIT "openrc")
-    elseif(EXISTS "/usr/lib/systemd" OR EXISTS "/etc/systemd")
+    elseif(EXISTS "/usr/lib/systemd" OR EXISTS "/lib/systemd" OR EXISTS "/etc/systemd")
         set(DETECTED_INIT "systemd")
     else()
         set(DETECTED_INIT "none")
     endif()
+else()
+    set(DETECTED_INIT "${INIT_SYSTEM}")
 endif()
 
 message(STATUS "Configuring service files for init system: ${DETECTED_INIT}")
 
 if(DETECTED_INIT STREQUAL "openrc")
-    install(PROGRAMS assets/init/xdg-desktop-portal-wormhole.initd
+    configure_file(
+        assets/init/xdg-desktop-portal-wormhole.initd.in
+        "${CMAKE_CURRENT_BINARY_DIR}/xdg-desktop-portal-wormhole.initd"
+        @ONLY
+    )
+    install(PROGRAMS "${CMAKE_CURRENT_BINARY_DIR}/xdg-desktop-portal-wormhole.initd"
         DESTINATION /etc/init.d
         RENAME xdg-desktop-portal-wormhole
     )
-    install(PROGRAMS assets/init/xdg-desktop-portal-wormhole.initd
+    install(PROGRAMS "${CMAKE_CURRENT_BINARY_DIR}/xdg-desktop-portal-wormhole.initd"
         DESTINATION ${CMAKE_INSTALL_DATADIR}/wormhole/openrc
         RENAME xdg-desktop-portal-wormhole
     )
 elseif(DETECTED_INIT STREQUAL "systemd")
-    install(FILES assets/init/xdg-desktop-portal-wormhole.service
+    configure_file(
+        assets/init/xdg-desktop-portal-wormhole.service.in
+        "${CMAKE_CURRENT_BINARY_DIR}/xdg-desktop-portal-wormhole.service"
+        @ONLY
+    )
+    install(FILES "${CMAKE_CURRENT_BINARY_DIR}/xdg-desktop-portal-wormhole.service"
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/systemd/user
     )
 endif()
