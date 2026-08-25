@@ -57,27 +57,27 @@ QTransform inverseOf(uint32_t transform) {
     QTransform t;
     switch (transform) {
     case WL_OUTPUT_TRANSFORM_90:
-        t.rotate(-90);
+        t.rotate(90);
         break;
     case WL_OUTPUT_TRANSFORM_180:
-        t.rotate(-180);
+        t.rotate(180);
         break;
     case WL_OUTPUT_TRANSFORM_270:
-        t.rotate(-270);
+        t.rotate(270);
         break;
     case WL_OUTPUT_TRANSFORM_FLIPPED:
         t.scale(-1, 1);
         break;
     case WL_OUTPUT_TRANSFORM_FLIPPED_90:
-        t.rotate(-90);
+        t.rotate(90);
         t.scale(-1, 1);
         break;
     case WL_OUTPUT_TRANSFORM_FLIPPED_180:
-        t.rotate(-180);
+        t.rotate(180);
         t.scale(-1, 1);
         break;
     case WL_OUTPUT_TRANSFORM_FLIPPED_270:
-        t.rotate(-270);
+        t.rotate(270);
         t.scale(-1, 1);
         break;
     default:
