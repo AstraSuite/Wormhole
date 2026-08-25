@@ -1,4 +1,8 @@
-# Wormhole
+<p align="center">
+  <img src="assets/wormhole.svg" width="140" alt="Wormhole Logo">
+</p>
+
+<h1 align="center">Wormhole</h1>
 
 **Wormhole** is a native, modern, Material 3 Expressive implementation of the `xdg-desktop-portal` backend designed for Wayland & Hyprland desktop environments.
 
