@@ -1,9 +1,13 @@
 #include "wallpaperportal.hpp"
 #include <QCoreApplication>
+#include <QDateTime>
 #include <QDebug>
+#include <QDir>
 #include <QFile>
 #include <QProcess>
+#include <QStandardPaths>
 #include <QUrl>
+#include <unistd.h>
 
 namespace wormhole::portal {
 
@@ -66,8 +70,8 @@ void WallpaperPortal::SetWallpaperURI(const QDBusObjectPath& handle,
             if (r.process && r.process->state() != QProcess::NotRunning) {
                 r.process->terminate();
             }
-            delete r.requestObject;
-            delete r.process;
+            if (r.requestObject) r.requestObject->deleteLater();
+            if (r.process) r.process->deleteLater();
 
             QDBusMessage reply = r.message.createReply();
             reply << static_cast<uint>(1) << QVariantMap();
@@ -81,8 +85,8 @@ void WallpaperPortal::SetWallpaperURI(const QDBusObjectPath& handle,
             return;
         }
         auto req = m_requests.take(handle.path());
-        delete req.requestObject;
-        req.process->deleteLater();
+        if (req.requestObject) req.requestObject->deleteLater();
+        if (req.process) req.process->deleteLater();
 
         QDBusMessage reply = req.message.createReply();
         reply << static_cast<uint>(exitCode == 0 ? 0 : 1) << QVariantMap();
@@ -98,8 +102,42 @@ void WallpaperPortal::SetWallpaperFile(const QDBusObjectPath& handle,
                                       const QDBusUnixFileDescriptor& fd,
                                       const QVariantMap& options,
                                       const QDBusMessage& message) {
-    QString path = QStringLiteral("/proc/self/fd/%1").arg(fd.fileDescriptor());
-    SetWallpaperURI(handle, app_id, parent_window, QStringLiteral("file://") + path, options, message);
+    if (!fd.isValid()) {
+        QDBusMessage reply = message.createReply();
+        reply << static_cast<uint>(1) << QVariantMap();
+        QDBusConnection::sessionBus().send(reply);
+        return;
+    }
+
+    int rawFd = fd.fileDescriptor();
+    int dupFd = dup(rawFd);
+    if (dupFd < 0) {
+        QDBusMessage reply = message.createReply();
+        reply << static_cast<uint>(1) << QVariantMap();
+        QDBusConnection::sessionBus().send(reply);
+        return;
+    }
+
+    QString cacheDir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + QStringLiteral("/wormhole");
+    QDir().mkpath(cacheDir);
+    QString tempPath = cacheDir + QStringLiteral("/wallpaper_%1.img").arg(QDateTime::currentMSecsSinceEpoch());
+
+    QFile srcFile;
+    if (srcFile.open(dupFd, QIODevice::ReadOnly, QFileDevice::AutoCloseHandle)) {
+        QFile dstFile(tempPath);
+        if (dstFile.open(QIODevice::WriteOnly)) {
+            dstFile.write(srcFile.readAll());
+            dstFile.close();
+            SetWallpaperURI(handle, app_id, parent_window, QStringLiteral("file://") + tempPath, options, message);
+            return;
+        }
+    } else {
+        close(dupFd);
+    }
+
+    QDBusMessage reply = message.createReply();
+    reply << static_cast<uint>(1) << QVariantMap();
+    QDBusConnection::sessionBus().send(reply);
 }
 
 } // namespace wormhole::portal

@@ -4,7 +4,6 @@ import wormhole
 import "../components"
 import "../components/controls"
 import "../components/containers"
-import "../components/effects"
 
 StyledRect {
     id: root
@@ -13,36 +12,31 @@ StyledRect {
     signal rejected()
 
     implicitWidth: 460
-    implicitHeight: 280
+    implicitHeight: 240
     radius: Tokens.rounding.extraLarge
     color: Colours.tPalette.m3surfaceContainer
-
-    Elevation {
-        anchors.fill: parent
-        level: 3
-        radius: root.radius
-    }
 
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: Tokens.padding.large
         spacing: Tokens.spacing.medium
 
-        // Icon + Title
+        // Header Row
         RowLayout {
             Layout.fillWidth: true
             spacing: Tokens.spacing.medium
 
             StyledRect {
-                implicitWidth: 48
-                implicitHeight: 48
+                implicitWidth: 40
+                implicitHeight: 40
                 radius: Tokens.rounding.medium
                 color: Colours.palette.m3primaryContainer
 
-                MaterialIcon {
+                SmartIcon {
                     anchors.centerIn: parent
-                    text: AppController.accessIcon.length > 0 ? AppController.accessIcon : "security"
-                    fontStyle: Tokens.font.icon.large
+                    iconName: AppController.accessIcon
+                    defaultIcon: "security"
+                    size: 24
                     color: Colours.palette.m3onPrimaryContainer
                 }
             }
@@ -58,26 +52,44 @@ StyledRect {
                 }
 
                 StyledText {
-                    text: AppController.accessSubtitle.length > 0 ? AppController.accessSubtitle : AppController.appId
-                    font: Tokens.font.body.medium
-                    color: Colours.palette.m3primary
+                    text: AppController.accessSubtitle.length > 0
+                          ? AppController.accessSubtitle
+                          : (AppController.appId.length > 0 ? qsTr("Requested by %1").arg(AppController.appId) : qsTr("System permission request"))
+                    font: Tokens.font.body.small
+                    color: Colours.palette.m3onSurfaceVariant
+                    elide: Text.ElideRight
+                    Layout.fillWidth: true
                 }
             }
         }
 
-        // Body Description
-        StyledText {
+        // Single Clean Description Card
+        StyledRect {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            wrapMode: Text.WordWrap
-            text: AppController.accessBody.length > 0
-                  ? AppController.accessBody
-                  : qsTr("The application \"%1\" is requesting access to your system features.").arg(AppController.appId)
-            font: Tokens.font.body.large
-            color: Colours.palette.m3onSurfaceVariant
+            radius: Tokens.rounding.large
+            color: Colours.palette.m3surfaceContainerLowest
+
+            ColumnLayout {
+                anchors.fill: parent
+                anchors.margins: Tokens.padding.large
+                spacing: Tokens.spacing.small
+
+                StyledText {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    wrapMode: Text.WordWrap
+                    verticalAlignment: Text.AlignVCenter
+                    text: AppController.accessBody.length > 0
+                          ? AppController.accessBody
+                          : qsTr("The application \"%1\" is requesting access to your system features.").arg(AppController.appId.length > 0 ? AppController.appId : qsTr("Application"))
+                    font: Tokens.font.body.medium
+                    color: Colours.palette.m3onSurface
+                }
+            }
         }
 
-        // Action Buttons
+        // Bottom Actions Row
         RowLayout {
             Layout.fillWidth: true
             spacing: Tokens.spacing.medium

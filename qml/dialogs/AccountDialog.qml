@@ -4,7 +4,6 @@ import wormhole
 import "../components"
 import "../components/controls"
 import "../components/containers"
-import "../components/effects"
 
 StyledRect {
     id: root
@@ -12,36 +11,31 @@ StyledRect {
     signal accepted(var result)
     signal rejected()
 
-    implicitWidth: 420
-    implicitHeight: 260
+    implicitWidth: 460
+    implicitHeight: 280
     radius: Tokens.rounding.extraLarge
     color: Colours.tPalette.m3surfaceContainer
-
-    Elevation {
-        anchors.fill: parent
-        level: 3
-        radius: root.radius
-    }
 
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: Tokens.padding.large
         spacing: Tokens.spacing.medium
 
+        // Header Row
         RowLayout {
             Layout.fillWidth: true
             spacing: Tokens.spacing.medium
 
             StyledRect {
-                implicitWidth: 56
-                implicitHeight: 56
-                radius: Tokens.rounding.full
+                implicitWidth: 40
+                implicitHeight: 40
+                radius: Tokens.rounding.medium
                 color: Colours.palette.m3primaryContainer
 
-                MaterialIcon {
+                SmartIcon {
                     anchors.centerIn: parent
-                    text: "account_circle"
-                    fontStyle: Tokens.font.icon.extraLarge
+                    iconName: "account_circle"
+                    size: 24
                     color: Colours.palette.m3onPrimaryContainer
                 }
             }
@@ -51,28 +45,112 @@ StyledRect {
                 spacing: 2
 
                 StyledText {
-                    text: qsTr("User Information")
+                    text: qsTr("User Information Request")
                     font: Tokens.font.title.medium
                     color: Colours.palette.m3onSurface
                 }
 
                 StyledText {
-                    text: qsTr("Share profile with %1").arg(AppController.appId)
+                    text: AppController.appId.length > 0
+                          ? qsTr("Permission requested by %1").arg(AppController.appId)
+                          : qsTr("An application is requesting your profile details")
                     font: Tokens.font.body.small
                     color: Colours.palette.m3onSurfaceVariant
+                    elide: Text.ElideRight
+                    Layout.fillWidth: true
                 }
             }
         }
 
-        StyledText {
+        // Single Clean Profile Details Card
+        StyledRect {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            wrapMode: Text.WordWrap
-            text: qsTr("Allow \"%1\" to read your username, display name, and avatar?").arg(AppController.appId)
-            font: Tokens.font.body.large
-            color: Colours.palette.m3onSurfaceVariant
+            radius: Tokens.rounding.large
+            color: Colours.palette.m3surfaceContainerLowest
+
+            ColumnLayout {
+                anchors.fill: parent
+                anchors.margins: Tokens.padding.medium
+                spacing: Tokens.spacing.small
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: Tokens.spacing.medium
+
+                    StyledRect {
+                        implicitWidth: 32
+                        implicitHeight: 32
+                        radius: 16
+                        color: Colours.palette.m3secondaryContainer
+
+                        SmartIcon {
+                            anchors.centerIn: parent
+                            iconName: "badge"
+                            size: 18
+                            color: Colours.palette.m3onSecondaryContainer
+                        }
+                    }
+
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 0
+                        StyledText {
+                            text: qsTr("User Account & Real Name")
+                            font: Tokens.font.label.large
+                            color: Colours.palette.m3onSurface
+                        }
+                        StyledText {
+                            text: qsTr("Your system username and display name")
+                            font: Tokens.font.body.small
+                            color: Colours.palette.m3onSurfaceVariant
+                        }
+                    }
+                }
+
+                Rectangle {
+                    Layout.fillWidth: true
+                    height: 1
+                    color: Qt.alpha(Colours.palette.m3outlineVariant, 0.4)
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: Tokens.spacing.medium
+
+                    StyledRect {
+                        implicitWidth: 32
+                        implicitHeight: 32
+                        radius: 16
+                        color: Colours.palette.m3secondaryContainer
+
+                        SmartIcon {
+                            anchors.centerIn: parent
+                            iconName: "face"
+                            size: 18
+                            color: Colours.palette.m3onSecondaryContainer
+                        }
+                    }
+
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 0
+                        StyledText {
+                            text: qsTr("User Avatar")
+                            font: Tokens.font.label.large
+                            color: Colours.palette.m3onSurface
+                        }
+                        StyledText {
+                            text: qsTr("Your profile picture (~/.face)")
+                            font: Tokens.font.body.small
+                            color: Colours.palette.m3onSurfaceVariant
+                        }
+                    }
+                }
+            }
         }
 
+        // Bottom Actions Row
         RowLayout {
             Layout.fillWidth: true
             spacing: Tokens.spacing.medium
@@ -80,12 +158,12 @@ StyledRect {
             Item { Layout.fillWidth: true }
 
             TextButton {
-                text: qsTr("Cancel")
+                text: qsTr("Deny")
                 onClicked: root.rejected()
             }
 
             TextButton {
-                text: qsTr("Share Profile")
+                text: qsTr("Allow")
                 type: ButtonBase.Filled
                 onClicked: root.accepted({ allow: true })
             }

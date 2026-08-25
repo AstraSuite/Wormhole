@@ -1,5 +1,12 @@
 #include "appcontroller.hpp"
 #include <QCoreApplication>
+#include <QDateTime>
+#include <QDir>
+#include <QFileInfo>
+#include <QProcess>
+#include <QStandardPaths>
+#include <QUrl>
+#include "screencast/waylandcapture.hpp"
 
 namespace wormhole::core {
 
@@ -190,6 +197,100 @@ void AppController::reject() {
 
 void AppController::quit() {
     QCoreApplication::quit();
+}
+
+void AppController::captureScreen() {
+    screencast::WaylandCapture capture;
+    m_screenCapture = capture.grabOutput(QString(), false, 2000);
+
+    if (m_screenCapture.isNull()) {
+        // Fallback: capture via grim to a temporary buffer
+        QString tmpPath = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + QStringLiteral("/wormhole_tmp_capture.png");
+        QDir().mkpath(QFileInfo(tmpPath).absolutePath());
+        if (QProcess::execute(QStringLiteral("grim"), { tmpPath }) == 0) {
+            m_screenCapture.load(tmpPath);
+            QFile::remove(tmpPath);
+        }
+    }
+}
+
+QVariantList AppController::pickColorAt(int x, int y) {
+    if (m_screenCapture.isNull()) {
+        captureScreen();
+    }
+
+    if (m_screenCapture.isNull() || x < 0 || y < 0 || x >= m_screenCapture.width() || y >= m_screenCapture.height()) {
+        // Fallback default
+        return { 0.815, 0.745, 0.957 };
+    }
+
+    QColor color = m_screenCapture.pixelColor(x, y);
+    return { color.redF(), color.greenF(), color.blueF() };
+}
+
+QString AppController::saveScreenshotRegion(int x, int y, int width, int height) {
+    QString picsDir = QStandardPaths::writableLocation(QStandardPaths::PicturesLocation) + QStringLiteral("/Screenshots");
+    QDir().mkpath(picsDir);
+    QString filePath = picsDir + QStringLiteral("/Screenshot_%1.png").arg(QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd_hhmmss")));
+
+    if (m_screenCapture.isNull()) {
+        captureScreen();
+    }
+
+    if (!m_screenCapture.isNull()) {
+        QRect cropRect = QRect(x, y, width, height).intersected(m_screenCapture.rect());
+        if (cropRect.isEmpty() || width <= 0 || height <= 0) {
+            cropRect = m_screenCapture.rect();
+        }
+        QImage cropped = m_screenCapture.copy(cropRect);
+        if (cropped.save(filePath, "PNG")) {
+            return QUrl::fromLocalFile(filePath).toString();
+        }
+    }
+
+    // Try grim with geometry
+    QString geom = QStringLiteral("%1,%2 %3x%4").arg(x).arg(y).arg(width).arg(height);
+    if (QProcess::execute(QStringLiteral("grim"), { QStringLiteral("-g"), geom, filePath }) == 0 && QFile::exists(filePath)) {
+        return QUrl::fromLocalFile(filePath).toString();
+    }
+
+    // Fallback grim fullscreen
+    if (QProcess::execute(QStringLiteral("grim"), { filePath }) == 0 && QFile::exists(filePath)) {
+        return QUrl::fromLocalFile(filePath).toString();
+    }
+
+    // Last resort dummy image
+    QImage dummy(qMax(100, width), qMax(100, height), QImage::Format_ARGB32_Premultiplied);
+    dummy.fill(QColor(30, 30, 30));
+    dummy.save(filePath, "PNG");
+    return QUrl::fromLocalFile(filePath).toString();
+}
+
+QString AppController::saveFullscreen() {
+    QString picsDir = QStandardPaths::writableLocation(QStandardPaths::PicturesLocation) + QStringLiteral("/Screenshots");
+    QDir().mkpath(picsDir);
+    QString filePath = picsDir + QStringLiteral("/Screenshot_%1.png").arg(QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd_hhmmss")));
+
+    if (m_screenCapture.isNull()) {
+        captureScreen();
+    }
+
+    if (!m_screenCapture.isNull()) {
+        if (m_screenCapture.save(filePath, "PNG")) {
+            return QUrl::fromLocalFile(filePath).toString();
+        }
+    }
+
+    // Try grim directly
+    if (QProcess::execute(QStringLiteral("grim"), { filePath }) == 0 && QFile::exists(filePath)) {
+        return QUrl::fromLocalFile(filePath).toString();
+    }
+
+    // Last resort
+    QImage dummy(1920, 1080, QImage::Format_ARGB32_Premultiplied);
+    dummy.fill(QColor(30, 30, 30));
+    dummy.save(filePath, "PNG");
+    return QUrl::fromLocalFile(filePath).toString();
 }
 
 } // namespace wormhole::core

@@ -52,8 +52,8 @@ void AppChooserPortal::ChooseApplication(const QDBusObjectPath& handle,
             if (r.process && r.process->state() != QProcess::NotRunning) {
                 r.process->terminate();
             }
-            delete r.requestObject;
-            delete r.process;
+            if (r.requestObject) r.requestObject->deleteLater();
+            if (r.process) r.process->deleteLater();
 
             QDBusMessage reply = r.message.createReply();
             reply << static_cast<uint>(1) << QVariantMap();
@@ -69,8 +69,8 @@ void AppChooserPortal::ChooseApplication(const QDBusObjectPath& handle,
         auto req = m_requests.take(handle.path());
         QByteArray stdoutData = req.process->readAllStandardOutput();
 
-        delete req.requestObject;
-        req.process->deleteLater();
+        if (req.requestObject) req.requestObject->deleteLater();
+        if (req.process) req.process->deleteLater();
 
         QDBusMessage reply = req.message.createReply();
         QVariantMap results;

@@ -4,7 +4,6 @@ import wormhole
 import "../components"
 import "../components/controls"
 import "../components/containers"
-import "../components/effects"
 
 StyledRect {
     id: root
@@ -15,16 +14,9 @@ StyledRect {
     signal accepted(var result)
     signal rejected()
 
-    implicitWidth: 540
+    implicitWidth: 580
     implicitHeight: 520
-    radius: Tokens.rounding.extraLarge
     color: Colours.tPalette.m3surfaceContainer
-
-    Elevation {
-        anchors.fill: parent
-        level: 3
-        radius: root.radius
-    }
 
     AppChooserModel {
         id: appModel
@@ -36,15 +28,23 @@ StyledRect {
         anchors.margins: Tokens.padding.large
         spacing: Tokens.spacing.medium
 
-        // Header
+        // Header Row
         RowLayout {
             Layout.fillWidth: true
-            spacing: Tokens.spacing.small
+            spacing: Tokens.spacing.medium
 
-            MaterialIcon {
-                text: "apps"
-                fontStyle: Tokens.font.icon.large
-                color: Colours.palette.m3primary
+            StyledRect {
+                implicitWidth: 40
+                implicitHeight: 40
+                radius: Tokens.rounding.medium
+                color: Colours.palette.m3primaryContainer
+
+                MaterialIcon {
+                    anchors.centerIn: parent
+                    text: "apps"
+                    fontStyle: Tokens.font.icon.medium
+                    color: Colours.palette.m3onPrimaryContainer
+                }
             }
 
             ColumnLayout {
@@ -67,97 +67,115 @@ StyledRect {
             }
         }
 
-        // Search Bar
-        SearchBar {
-            Layout.fillWidth: true
-            onTextChanged: appModel.searchQuery = text
-        }
-
-        // Apps List
-        VerticalFadeListView {
-            id: appList
+        // Inner Container Frame
+        StyledRect {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            model: appModel
-            spacing: Tokens.spacing.extraSmall
+            radius: Tokens.rounding.large
+            color: Colours.palette.m3surfaceContainerLowest
             clip: true
 
-            delegate: Item {
-                width: appList.width
-                height: 56
+            ColumnLayout {
+                anchors.fill: parent
+                anchors.margins: Tokens.padding.medium
+                spacing: Tokens.spacing.small
 
-                readonly property bool isSelected: root.selectedDesktopId === model.desktopId
+                // Search Bar
+                SearchBar {
+                    Layout.fillWidth: true
+                    onTextChanged: appModel.searchQuery = text
+                }
 
-                StyledRect {
-                    anchors.fill: parent
-                    radius: Tokens.rounding.medium
-                    color: isSelected ? Colours.palette.m3primaryContainer : Colours.palette.m3surfaceContainerHigh
-                    border.width: isSelected ? 2 : 1
-                    border.color: isSelected ? Colours.palette.m3primary : "transparent"
+                // Apps List
+                VerticalFadeListView {
+                    id: appList
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    model: appModel
+                    spacing: Tokens.spacing.extraSmall
+                    clip: true
 
-                    RowLayout {
-                        anchors.fill: parent
-                        anchors.margins: Tokens.padding.medium
-                        spacing: Tokens.spacing.medium
+                    delegate: Item {
+                        width: appList.width
+                        height: 56
 
-                        Image {
-                            source: "image://icon/" + (model.iconName || "application-x-executable")
-                            sourceSize.width: 32
-                            sourceSize.height: 32
-                            Layout.preferredWidth: 32
-                            Layout.preferredHeight: 32
-                            fillMode: Image.PreserveAspectFit
-                        }
+                        readonly property bool isSelected: root.selectedDesktopId === model.desktopId
 
-                        ColumnLayout {
-                            Layout.fillWidth: true
-                            spacing: 1
+                        StyledRect {
+                            anchors.fill: parent
+                            radius: Tokens.rounding.medium
+                            color: isSelected ? Colours.palette.m3primaryContainer : (appMouse.containsMouse ? Colours.palette.m3surfaceContainerHighest : Colours.palette.m3surfaceContainerHigh)
+                            border.width: isSelected ? 2 : 1
+                            border.color: isSelected ? Colours.palette.m3primary : "transparent"
 
                             RowLayout {
-                                spacing: Tokens.spacing.small
+                                anchors.fill: parent
+                                anchors.margins: Tokens.padding.medium
+                                spacing: Tokens.spacing.medium
 
-                                StyledText {
-                                    text: model.name
-                                    font: Tokens.font.title.small
-                                    color: isSelected ? Colours.palette.m3onPrimaryContainer : Colours.palette.m3onSurface
+                                Image {
+                                    source: "image://icon/" + (model.iconName || "application-x-executable")
+                                    sourceSize.width: 32
+                                    sourceSize.height: 32
+                                    Layout.preferredWidth: 32
+                                    Layout.preferredHeight: 32
+                                    fillMode: Image.PreserveAspectFit
                                 }
 
-                                StyledRect {
-                                    visible: model.isRecommended
-                                    implicitHeight: 18
-                                    implicitWidth: recText.implicitWidth + 8
-                                    radius: Tokens.rounding.extraSmall
-                                    color: Colours.palette.m3secondaryContainer
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 1
+
+                                    RowLayout {
+                                        spacing: Tokens.spacing.small
+
+                                        StyledText {
+                                            text: model.name
+                                            font: Tokens.font.title.small
+                                            color: isSelected ? Colours.palette.m3onPrimaryContainer : Colours.palette.m3onSurface
+                                        }
+
+                                        StyledRect {
+                                            visible: model.isRecommended
+                                            implicitHeight: 18
+                                            implicitWidth: recText.implicitWidth + 8
+                                            radius: Tokens.rounding.extraSmall
+                                            color: Colours.palette.m3secondaryContainer
+
+                                            StyledText {
+                                                id: recText
+                                                anchors.centerIn: parent
+                                                text: qsTr("Recommended")
+                                                font: Tokens.font.label.small
+                                                color: Colours.palette.m3onSecondaryContainer
+                                            }
+                                        }
+                                    }
 
                                     StyledText {
-                                        id: recText
-                                        anchors.centerIn: parent
-                                        text: qsTr("Recommended")
-                                        font: Tokens.font.label.small
-                                        color: Colours.palette.m3onSecondaryContainer
+                                        Layout.fillWidth: true
+                                        text: model.comment.length > 0 ? model.comment : model.desktopId
+                                        font: Tokens.font.body.small
+                                        elide: Text.ElideRight
+                                        color: isSelected ? Colours.palette.m3onPrimaryContainer : Colours.palette.m3onSurfaceVariant
                                     }
                                 }
                             }
 
-                            StyledText {
-                                Layout.fillWidth: true
-                                text: model.comment.length > 0 ? model.comment : model.desktopId
-                                font: Tokens.font.body.small
-                                elide: Text.ElideRight
-                                color: isSelected ? Colours.palette.m3onPrimaryContainer : Colours.palette.m3onSurfaceVariant
+                            MouseArea {
+                                id: appMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root.selectedDesktopId = model.desktopId
+                                onDoubleClicked: {
+                                    root.selectedDesktopId = model.desktopId;
+                                    root.accepted({
+                                        choice: root.selectedDesktopId,
+                                        remember: root.rememberChoice
+                                    });
+                                }
                             }
-                        }
-                    }
-
-                    StateLayer {
-                        radius: parent.radius
-                        onClicked: root.selectedDesktopId = model.desktopId
-                        onDoubleClicked: {
-                            root.selectedDesktopId = model.desktopId;
-                            root.accepted({
-                                choice: root.selectedDesktopId,
-                                remember: root.rememberChoice
-                            });
                         }
                     }
                 }

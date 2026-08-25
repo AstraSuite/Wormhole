@@ -4,7 +4,6 @@ import wormhole
 import "../components"
 import "../components/controls"
 import "../components/containers"
-import "../components/effects"
 
 StyledRect {
     id: root
@@ -13,35 +12,30 @@ StyledRect {
     signal rejected()
 
     implicitWidth: 460
-    implicitHeight: 280
+    implicitHeight: 260
     radius: Tokens.rounding.extraLarge
     color: Colours.tPalette.m3surfaceContainer
-
-    Elevation {
-        anchors.fill: parent
-        level: 3
-        radius: root.radius
-    }
 
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: Tokens.padding.large
         spacing: Tokens.spacing.medium
 
+        // Header Row
         RowLayout {
             Layout.fillWidth: true
             spacing: Tokens.spacing.medium
 
             StyledRect {
-                implicitWidth: 48
-                implicitHeight: 48
+                implicitWidth: 40
+                implicitHeight: 40
                 radius: Tokens.rounding.medium
                 color: Colours.palette.m3primaryContainer
 
-                MaterialIcon {
+                SmartIcon {
                     anchors.centerIn: parent
-                    text: "install_desktop"
-                    fontStyle: Tokens.font.icon.large
+                    iconName: "install_desktop"
+                    size: 24
                     color: Colours.palette.m3onPrimaryContainer
                 }
             }
@@ -51,28 +45,72 @@ StyledRect {
                 spacing: 2
 
                 StyledText {
-                    text: qsTr("Install Web Application")
+                    text: qsTr("Install Application")
                     font: Tokens.font.title.medium
                     color: Colours.palette.m3onSurface
                 }
 
                 StyledText {
-                    text: AppController.launcherName.length > 0 ? AppController.launcherName : AppController.appId
-                    font: Tokens.font.body.medium
-                    color: Colours.palette.m3primary
+                    text: qsTr("Add shortcut to your application launcher")
+                    font: Tokens.font.body.small
+                    color: Colours.palette.m3onSurfaceVariant
                 }
             }
         }
 
-        StyledText {
+        // Single Clean Launcher App Card
+        StyledRect {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            wrapMode: Text.WordWrap
-            text: qsTr("Add \"%1\" to your application launcher? This will allow you to launch it directly from your desktop.").arg(AppController.launcherName)
-            font: Tokens.font.body.large
-            color: Colours.palette.m3onSurfaceVariant
+            radius: Tokens.rounding.large
+            color: Colours.palette.m3surfaceContainerLowest
+
+            RowLayout {
+                anchors.fill: parent
+                anchors.margins: Tokens.padding.large
+                spacing: Tokens.spacing.medium
+
+                StyledRect {
+                    implicitWidth: 48
+                    implicitHeight: 48
+                    radius: Tokens.rounding.medium
+                    color: Colours.palette.m3surfaceContainerHigh
+
+                    SmartIcon {
+                        anchors.centerIn: parent
+                        iconName: AppController.launcherIcon.length > 0 ? AppController.launcherIcon : "applications-other"
+                        defaultIcon: "apps"
+                        size: 32
+                    }
+                }
+
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    Layout.alignment: Qt.AlignVCenter
+                    spacing: 2
+
+                    StyledText {
+                        text: AppController.launcherName.length > 0 ? AppController.launcherName : AppController.appId
+                        font: Tokens.font.title.small
+                        color: Colours.palette.m3onSurface
+                        elide: Text.ElideRight
+                        Layout.fillWidth: true
+                    }
+
+                    StyledText {
+                        text: AppController.launcherUrl.length > 0
+                              ? AppController.launcherUrl
+                              : (AppController.launcherExec.length > 0 ? AppController.launcherExec : AppController.appId)
+                        font: Tokens.font.body.small
+                        color: Colours.palette.m3primary
+                        elide: Text.ElideRight
+                        Layout.fillWidth: true
+                    }
+                }
+            }
         }
 
+        // Bottom Actions Row
         RowLayout {
             Layout.fillWidth: true
             spacing: Tokens.spacing.medium

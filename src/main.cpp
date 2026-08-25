@@ -78,13 +78,16 @@ int main(int argc, char* argv[]) {
 
     QCommandLineOption daemonOpt(QStringList{ "d", "daemon" }, "Run as D-Bus portal daemon");
     QCommandLineOption screencastOpt("screencast", "Open ScreenCast source chooser");
+    QCommandLineOption screenshotOpt("screenshot", "Open Screenshot capture overlay");
     QCommandLineOption fileChooserOpt(QStringList{ "file-chooser", "filechooser" }, "Open File Chooser via Atlas picker");
     QCommandLineOption pickColorOpt("pick-color", "Open Color Picker");
+    QCommandLineOption appChooserOpt(QStringList{ "appchooser", "app-chooser" }, "Open Application Chooser");
     QCommandLineOption accessOpt("access", "Open Permission Access dialog");
     QCommandLineOption accountOpt("account", "Open User Account dialog");
     QCommandLineOption dynamicLauncherOpt("dynamic-launcher", "Open Dynamic Launcher installer");
     QCommandLineOption wallpaperOpt("wallpaper", "Open Wallpaper preview dialog");
 
+    QCommandLineOption typesOpt(QStringList{ "types", "source-types" }, "Available source types bitmask", "types");
     QCommandLineOption titleOpt("title", "Dialog title", "title");
     QCommandLineOption appIdOpt("app-id", "Calling application ID", "appId");
     QCommandLineOption parentWinOpt("parent-window", "Parent window handle", "parent");
@@ -96,19 +99,26 @@ int main(int argc, char* argv[]) {
     QCommandLineOption iconOpt("icon", "Icon name / path", "icon");
     QCommandLineOption subtitleOpt("subtitle", "Dialog subtitle", "subtitle");
     QCommandLineOption bodyOpt("body", "Dialog body explanation", "body");
-    QCommandLineOption multipleOpt("multiple", "Allow selecting multiple files");
+    QCommandLineOption mimeOpt(QStringList{ "mime", "mime-type" }, "Target MIME type for app chooser", "mime");
+    QCommandLineOption choicesOpt("choices", "Comma-separated list of application choices", "choices");
+    QCommandLineOption interactiveOpt("interactive", "Interactive screenshot capture mode");
+    QCommandLineOption delayOpt("delay", "Screenshot delay in seconds", "delay");
+    QCommandLineOption multipleOpt("multiple", "Allow selecting multiple sources or files");
     QCommandLineOption directoryOpt("directory", "Select folder mode");
     QCommandLineOption saveOpt("save", "Save file mode");
 
     parser.addOption(daemonOpt);
     parser.addOption(screencastOpt);
+    parser.addOption(screenshotOpt);
     parser.addOption(fileChooserOpt);
     parser.addOption(pickColorOpt);
+    parser.addOption(appChooserOpt);
     parser.addOption(accessOpt);
     parser.addOption(accountOpt);
     parser.addOption(dynamicLauncherOpt);
     parser.addOption(wallpaperOpt);
 
+    parser.addOption(typesOpt);
     parser.addOption(titleOpt);
     parser.addOption(appIdOpt);
     parser.addOption(parentWinOpt);
@@ -120,6 +130,10 @@ int main(int argc, char* argv[]) {
     parser.addOption(iconOpt);
     parser.addOption(subtitleOpt);
     parser.addOption(bodyOpt);
+    parser.addOption(mimeOpt);
+    parser.addOption(choicesOpt);
+    parser.addOption(interactiveOpt);
+    parser.addOption(delayOpt);
     parser.addOption(multipleOpt);
     parser.addOption(directoryOpt);
     parser.addOption(saveOpt);
@@ -160,6 +174,8 @@ int main(int argc, char* argv[]) {
 
     auto* controller = wormhole::core::AppController::instance();
 
+    if (parser.isSet(typesOpt)) controller->setAvailableSourceTypes(parser.value(typesOpt).toUInt());
+    if (parser.isSet(multipleOpt)) controller->setMultipleSources(true);
     if (parser.isSet(titleOpt)) controller->setTitle(parser.value(titleOpt));
     if (parser.isSet(appIdOpt)) controller->setAppId(parser.value(appIdOpt));
     if (parser.isSet(parentWinOpt)) controller->setParentWindow(parser.value(parentWinOpt));
@@ -167,6 +183,8 @@ int main(int argc, char* argv[]) {
     if (parser.isSet(persistModeOpt)) controller->setAllowToken(parser.value(persistModeOpt).toUInt() != 0);
     if (parser.isSet(urlOpt)) {
         controller->setWallpaperUri(parser.value(urlOpt));
+        controller->setLauncherUrl(parser.value(urlOpt));
+        controller->setAppChooserUrl(parser.value(urlOpt));
     }
     if (parser.isSet(nameOpt)) controller->setLauncherName(parser.value(nameOpt));
     if (parser.isSet(execOpt)) controller->setLauncherExec(parser.value(execOpt));
@@ -176,12 +194,21 @@ int main(int argc, char* argv[]) {
     }
     if (parser.isSet(subtitleOpt)) controller->setAccessSubtitle(parser.value(subtitleOpt));
     if (parser.isSet(bodyOpt)) controller->setAccessBody(parser.value(bodyOpt));
+    if (parser.isSet(mimeOpt)) controller->setAppChooserMime(parser.value(mimeOpt));
+    if (parser.isSet(choicesOpt)) controller->setAppChooserChoices(parser.value(choicesOpt).split(QLatin1Char(','), Qt::SkipEmptyParts));
+    if (parser.isSet(interactiveOpt)) controller->setIsScreenshotInteractive(true);
+    if (parser.isSet(delayOpt)) controller->setScreenshotDelay(parser.value(delayOpt).toInt());
 
     if (parser.isSet(screencastOpt)) {
         controller->setDialogMode(wormhole::core::AppController::DialogMode::ScreenCast);
+    } else if (parser.isSet(screenshotOpt)) {
+        controller->setDialogMode(wormhole::core::AppController::DialogMode::Screenshot);
+        controller->setIsPickColorMode(false);
     } else if (parser.isSet(pickColorOpt)) {
         controller->setDialogMode(wormhole::core::AppController::DialogMode::Screenshot);
         controller->setIsPickColorMode(true);
+    } else if (parser.isSet(appChooserOpt)) {
+        controller->setDialogMode(wormhole::core::AppController::DialogMode::AppChooser);
     } else if (parser.isSet(accessOpt)) {
         controller->setDialogMode(wormhole::core::AppController::DialogMode::Access);
     } else if (parser.isSet(accountOpt)) {

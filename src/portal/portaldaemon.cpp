@@ -36,17 +36,31 @@ bool PortalDaemon::start() {
 
     const QString objectPath = QStringLiteral("/org/freedesktop/portal/desktop");
 
-    m_fileChooser = new FileChooserPortal(this);
-    m_screenCast = new ScreenCastPortal(this);
-    m_screenshot = new ScreenshotPortal(this);
-    m_appChooser = new AppChooserPortal(this);
     m_access = new AccessPortal(this);
     m_account = new AccountPortal(this);
+    m_appChooser = new AppChooserPortal(this);
+    m_background = new BackgroundPortal(this);
+    m_camera = new CameraPortal(this);
+    m_clipboard = new ClipboardPortal(this);
     m_dynamicLauncher = new DynamicLauncherPortal(this);
-    m_wallpaper = new WallpaperPortal(this);
+    m_email = new EmailPortal(this);
+    m_fileChooser = new FileChooserPortal(this);
+    m_globalShortcuts = new GlobalShortcutsPortal(this);
     m_inhibit = new InhibitPortal(this);
     m_notifInhibit = new NotificationInhibitionPortal(this);
+    m_inputCapture = new InputCapturePortal(this);
+    m_location = new LocationPortal(this);
+    m_lockdown = new LockdownPortal(this);
+    m_notification = new NotificationPortal(this);
+    m_print = new PrintPortal(this);
+    m_realtime = new RealtimePortal(this);
+    m_remoteDesktop = new RemoteDesktopPortal(this);
+    m_screenCast = new ScreenCastPortal(this);
+    m_screenshot = new ScreenshotPortal(this);
+    m_secret = new SecretPortal(this);
     m_settings = new SettingsPortal(this);
+    m_usb = new UsbPortal(this);
+    m_wallpaper = new WallpaperPortal(this);
 
     if (!bus.registerObject(objectPath, this, QDBusConnection::ExportAdaptors)) {
         QDBusError error = bus.lastError();

@@ -49,9 +49,22 @@ private:
         QDBusMessage message;
         QProcess* process = nullptr;
         PortalRequest* requestObject = nullptr;
+        QString name;
+        QString iconName;
+        QString execName;
+        QString url;
+    };
+
+    struct PreparedLauncher {
+        QString name;
+        QString iconName;
+        QString execName;
+        QString url;
+        QString appId;
     };
 
     QMap<QString, PendingRequest> m_requests;
+    QMap<QString, PreparedLauncher> m_prepared;
 };
 
 } // namespace wormhole::portal

@@ -358,12 +358,14 @@ void WaylandCapture::disconnectDisplay() {
 }
 
 wl_output* WaylandCapture::findOutput(const QString& name) const {
-    for (const auto& entry : m_outputs) {
-        if (entry.name == name) {
-            return entry.output;
+    if (!name.isEmpty()) {
+        for (const auto& entry : m_outputs) {
+            if (entry.name == name) {
+                return entry.output;
+            }
         }
     }
-    if (m_outputs.size() == 1) {
+    if (!m_outputs.isEmpty()) {
         return m_outputs.first().output;
     }
     return nullptr;

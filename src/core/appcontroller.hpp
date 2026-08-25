@@ -8,6 +8,7 @@
 #include <QVariantMap>
 #include <QJsonObject>
 #include <QJsonArray>
+#include <QImage>
 #include <qqmlintegration.h>
 
 namespace wormhole::core {
@@ -149,6 +150,11 @@ public:
     Q_INVOKABLE void reject();
     Q_INVOKABLE void quit();
 
+    Q_INVOKABLE QVariantList pickColorAt(int x, int y);
+    Q_INVOKABLE QString saveScreenshotRegion(int x, int y, int width, int height);
+    Q_INVOKABLE QString saveFullscreen();
+    Q_INVOKABLE void captureScreen();
+
 signals:
     void dialogModeChanged();
     void titleChanged();
@@ -211,6 +217,7 @@ private:
 
     QString m_wallpaperUri;
     QString m_wallpaperSetOn = QStringLiteral("both");
+    QImage m_screenCapture;
 };
 
 } // namespace wormhole::core

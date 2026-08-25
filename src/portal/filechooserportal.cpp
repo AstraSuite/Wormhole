@@ -7,6 +7,7 @@
 #include <QFileInfo>
 #include <QMimeDatabase>
 #include <QMimeType>
+#include <QStandardPaths>
 #include <QUrl>
 
 namespace wormhole::portal {
@@ -21,15 +22,15 @@ QString FileChooserPortal::findAtlasBinary() {
     if (QFile::exists(appDir + QStringLiteral("/atlas"))) {
         return appDir + QStringLiteral("/atlas");
     }
-    // Check user build directory
-    if (QFile::exists(QStringLiteral("/home/dim/Projects/Prism/build/bin/atlas"))) {
-        return QStringLiteral("/home/dim/Projects/Prism/build/bin/atlas");
+    // Check PATH
+    QString inPath = QStandardPaths::findExecutable(QStringLiteral("atlas"));
+    if (!inPath.isEmpty()) {
+        return inPath;
     }
-    // Check /usr/bin/atlas
+    // Check common prefixes
     if (QFile::exists(QStringLiteral("/usr/bin/atlas"))) {
         return QStringLiteral("/usr/bin/atlas");
     }
-    // Check /usr/local/bin/atlas
     if (QFile::exists(QStringLiteral("/usr/local/bin/atlas"))) {
         return QStringLiteral("/usr/local/bin/atlas");
     }
@@ -154,12 +155,13 @@ void FileChooserPortal::OpenFile(const QDBusObjectPath& handle,
     QString dialogTitle = title.isEmpty() ? QStringLiteral("Open File") : title;
     QString initialDir = parseInitialDirectory(options);
     bool directoryOnly = options.value(QStringLiteral("directory"), false).toBool();
+    bool multiple = options.value(QStringLiteral("multiple"), false).toBool();
 
     QStringList filters;
     QString filterLabel;
     parseFilters(options, filters, filterLabel);
 
-    launchAtlasPicker(dialogTitle, initialDir, directoryOnly, filters, filterLabel, handle, message);
+    launchAtlasPicker(dialogTitle, initialDir, directoryOnly, filters, filterLabel, handle, message, false, {}, false, {}, multiple);
 }
 
 void FileChooserPortal::SaveFile(const QDBusObjectPath& handle,
@@ -224,7 +226,8 @@ void FileChooserPortal::launchAtlasPicker(const QString& title,
                                          bool isSaveFiles,
                                          const QStringList& fileList,
                                          bool saveMode,
-                                         const QString& suggestedName) {
+                                         const QString& suggestedName,
+                                         bool multiple) {
     QString atlasBin = findAtlasBinary();
     QStringList args;
     args << QStringLiteral("--picker");
@@ -235,6 +238,9 @@ void FileChooserPortal::launchAtlasPicker(const QString& title,
     }
     if (directoryOnly) {
         args << QStringLiteral("--directory-only");
+    }
+    if (multiple) {
+        args << QStringLiteral("--multiple");
     }
     if (saveMode) {
         args << QStringLiteral("--save");
@@ -267,8 +273,8 @@ void FileChooserPortal::launchAtlasPicker(const QString& title,
             if (r.process && r.process->state() != QProcess::NotRunning) {
                 r.process->terminate();
             }
-            delete r.requestObject;
-            delete r.process;
+            if (r.requestObject) r.requestObject->deleteLater();
+            if (r.process) r.process->deleteLater();
 
             QDBusMessage reply = r.message.createReply();
             reply << static_cast<uint>(1) << QVariantMap();
@@ -284,8 +290,8 @@ void FileChooserPortal::launchAtlasPicker(const QString& title,
         auto req = m_requests.take(handle.path());
         QByteArray stdoutData = req.process->readAllStandardOutput();
 
-        delete req.requestObject;
-        req.process->deleteLater();
+        if (req.requestObject) req.requestObject->deleteLater();
+        if (req.process) req.process->deleteLater();
 
         QDBusMessage reply = req.message.createReply();
         QVariantMap results;

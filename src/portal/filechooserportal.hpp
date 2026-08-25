@@ -64,7 +64,8 @@ private:
                            bool isSaveFiles = false,
                            const QStringList& fileList = {},
                            bool saveMode = false,
-                           const QString& suggestedName = {});
+                           const QString& suggestedName = {},
+                           bool multiple = false);
 
     static QString parseInitialDirectory(const QVariantMap& options);
     static void parseFilters(const QVariantMap& options, QStringList& outFilters, QString& outLabel);

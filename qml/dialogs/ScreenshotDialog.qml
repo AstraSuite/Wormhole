@@ -95,6 +95,13 @@ Item {
         }
     }
 
+    Component.onCompleted: {
+        if (AppController.isPickColorMode) {
+            root.captureMode = 3;
+        }
+        AppController.captureScreen();
+    }
+
     // Mouse Area for Region Drag Selection
     MouseArea {
         id: dragArea
@@ -103,6 +110,16 @@ Item {
         cursorShape: root.captureMode === 3 ? Qt.CrossCursor : Qt.CrossCursor
 
         onPressed: (mouse) => {
+            if (root.captureMode === 3) {
+                let col = AppController.pickColorAt(mouse.x, mouse.y);
+                root.accepted({ color: col });
+                return;
+            }
+            if (root.captureMode === 2) {
+                let path = AppController.saveFullscreen();
+                root.accepted({ uri: path });
+                return;
+            }
             root.startPoint = Qt.point(mouse.x, mouse.y);
             root.currentPoint = Qt.point(mouse.x, mouse.y);
             root.isSelecting = true;
@@ -115,19 +132,20 @@ Item {
         }
 
         onReleased: (mouse) => {
-            if (root.isSelecting) {
+            if (root.captureMode === 3) {
+                let col = AppController.pickColorAt(mouse.x, mouse.y);
+                root.accepted({ color: col });
+            } else if (root.captureMode === 2) {
+                let path = AppController.saveFullscreen();
+                root.accepted({ uri: path });
+            } else if (root.isSelecting) {
                 root.currentPoint = Qt.point(mouse.x, mouse.y);
                 root.isSelecting = false;
 
-                if (root.captureMode === 3) {
-                    // Pick Color Mode
+                if (root.selectionW > 4 && root.selectionH > 4) {
+                    let path = AppController.saveScreenshotRegion(root.selectionX, root.selectionY, root.selectionW, root.selectionH);
                     root.accepted({
-                        color: [0.8, 0.6, 1.0]
-                    });
-                } else if (root.selectionW > 4 && root.selectionH > 4) {
-                    // Region Selected
-                    root.accepted({
-                        uri: "file:///tmp/wormhole-screenshot.png",
+                        uri: path,
                         x: root.selectionX,
                         y: root.selectionY,
                         width: root.selectionW,

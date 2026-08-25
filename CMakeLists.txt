@@ -21,6 +21,7 @@ find_package(Qt6 6.5 REQUIRED COMPONENTS
     Svg
     DBus
     Network
+    Test
 )
 
 find_package(PkgConfig REQUIRED)
@@ -95,26 +96,54 @@ qt_add_executable(wormhole_app
     src/portal/session.cpp
     src/portal/restorestore.hpp
     src/portal/restorestore.cpp
-    src/portal/filechooserportal.hpp
-    src/portal/filechooserportal.cpp
-    src/portal/screencastportal.hpp
-    src/portal/screencastportal.cpp
-    src/portal/screenshotportal.hpp
-    src/portal/screenshotportal.cpp
-    src/portal/appchooserportal.hpp
-    src/portal/appchooserportal.cpp
     src/portal/accessportal.hpp
     src/portal/accessportal.cpp
     src/portal/accountportal.hpp
     src/portal/accountportal.cpp
+    src/portal/appchooserportal.hpp
+    src/portal/appchooserportal.cpp
+    src/portal/backgroundportal.hpp
+    src/portal/backgroundportal.cpp
+    src/portal/cameraportal.hpp
+    src/portal/cameraportal.cpp
+    src/portal/clipboardportal.hpp
+    src/portal/clipboardportal.cpp
     src/portal/dynamiclauncherportal.hpp
     src/portal/dynamiclauncherportal.cpp
-    src/portal/wallpaperportal.hpp
-    src/portal/wallpaperportal.cpp
+    src/portal/emailportal.hpp
+    src/portal/emailportal.cpp
+    src/portal/filechooserportal.hpp
+    src/portal/filechooserportal.cpp
+    src/portal/globalshortcutsportal.hpp
+    src/portal/globalshortcutsportal.cpp
     src/portal/inhibitportal.hpp
     src/portal/inhibitportal.cpp
+    src/portal/inputcaptureportal.hpp
+    src/portal/inputcaptureportal.cpp
+    src/portal/locationportal.hpp
+    src/portal/locationportal.cpp
+    src/portal/lockdownportal.hpp
+    src/portal/lockdownportal.cpp
+    src/portal/notificationportal.hpp
+    src/portal/notificationportal.cpp
+    src/portal/printportal.hpp
+    src/portal/printportal.cpp
+    src/portal/realtimeportal.hpp
+    src/portal/realtimeportal.cpp
+    src/portal/remotedesktopportal.hpp
+    src/portal/remotedesktopportal.cpp
+    src/portal/screencastportal.hpp
+    src/portal/screencastportal.cpp
+    src/portal/screenshotportal.hpp
+    src/portal/screenshotportal.cpp
+    src/portal/secretportal.hpp
+    src/portal/secretportal.cpp
     src/portal/settingsportal.hpp
     src/portal/settingsportal.cpp
+    src/portal/usbportal.hpp
+    src/portal/usbportal.cpp
+    src/portal/wallpaperportal.hpp
+    src/portal/wallpaperportal.cpp
     src/portal/portaldaemon.hpp
     src/portal/portaldaemon.cpp
     ${WAYLAND_PROTOCOL_SOURCES}
@@ -148,6 +177,7 @@ qt_add_qml_module(wormhole_app
         qml/components/Logo.qml
         qml/components/Mask.qml
         qml/components/MaterialIcon.qml
+        qml/components/SmartIcon.qml
         qml/components/ScreenState.qml
         qml/components/StateLayer.qml
         qml/components/StyledClippingRect.qml
@@ -316,3 +346,22 @@ elseif(DETECTED_INIT STREQUAL "systemd")
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/systemd/user
     )
 endif()
+
+enable_testing()
+
+add_executable(test_restorestore
+    tests/test_restorestore.cpp
+    src/portal/restorestore.cpp
+    src/portal/restorestore.hpp
+)
+
+target_include_directories(test_restorestore PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+target_link_libraries(test_restorestore PRIVATE
+    Qt6::Core
+    Qt6::Test
+)
+
+add_test(NAME test_restorestore COMMAND test_restorestore)
