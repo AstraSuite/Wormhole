@@ -4,6 +4,7 @@ import QtQuick.Layouts
 import wormhole
 import "components"
 import "components/controls"
+import "components/filedialog"
 import "dialogs"
 
 Window {
@@ -74,6 +75,8 @@ Window {
                 return dynamicLauncherComp;
             case AppController.Wallpaper:
                 return wallpaperComp;
+            case AppController.FileChooser:
+                return fileChooserComp;
             default:
                 return screenChooserComp;
             }
@@ -169,6 +172,22 @@ Window {
         WallpaperDialog {
             onAccepted: (result) => {
                 AppController.accept(result);
+                Qt.quit();
+            }
+            onRejected: {
+                AppController.reject();
+                Qt.quit();
+            }
+        }
+    }
+
+    Component {
+        id: fileChooserComp
+        FileDialog {
+            implicitWidth: 1000
+            implicitHeight: 600
+            onAccepted: path => {
+                AppController.accept({ "uris": ["file://" + path] });
                 Qt.quit();
             }
             onRejected: {

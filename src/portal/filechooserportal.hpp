@@ -21,7 +21,7 @@ public:
     explicit FileChooserPortal(QObject* parent = nullptr);
     ~FileChooserPortal() override = default;
 
-    static QString findAtlasBinary();
+    static QString findWormholeBinary();
 
 public slots:
     Q_SCRIPTABLE void OpenFile(const QDBusObjectPath& handle,
@@ -54,7 +54,7 @@ private:
         QStringList fileListToSave;
     };
 
-    void launchAtlasPicker(const QString& title,
+    void launchPicker(const QString& title,
                            const QString& initialDir,
                            bool directoryOnly,
                            const QStringList& filters,

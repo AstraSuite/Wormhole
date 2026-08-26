@@ -24,6 +24,19 @@ class AppController : public QObject {
     Q_PROPERTY(QString appId READ appId WRITE setAppId NOTIFY appIdChanged)
     Q_PROPERTY(QString parentWindow READ parentWindow WRITE setParentWindow NOTIFY parentWindowChanged)
 
+    // FileChooser Specific
+    Q_PROPERTY(QString initialDirectory READ initialDirectory WRITE setInitialDirectory NOTIFY initialDirectoryChanged)
+    Q_PROPERTY(QString filterLabel READ filterLabel WRITE setFilterLabel NOTIFY filterLabelChanged)
+    Q_PROPERTY(QStringList filters READ filters WRITE setFilters NOTIFY filtersChanged)
+    Q_PROPERTY(bool directoryOnly READ directoryOnly WRITE setDirectoryOnly NOTIFY directoryOnlyChanged)
+    Q_PROPERTY(bool saveMode READ saveMode NOTIFY saveModeChanged)
+    Q_PROPERTY(QString suggestedName READ suggestedName NOTIFY suggestedNameChanged)
+    Q_PROPERTY(bool showHidden READ showHidden WRITE setShowHidden NOTIFY showHiddenChanged)
+    Q_PROPERTY(int placesIconSize READ placesIconSize WRITE setPlacesIconSize NOTIFY placesIconSizeChanged)
+    Q_PROPERTY(bool singleClick READ singleClick WRITE setSingleClick NOTIFY singleClickChanged)
+    Q_PROPERTY(bool caseSensitiveSort READ caseSensitiveSort WRITE setCaseSensitiveSort NOTIFY caseSensitiveSortChanged)
+    Q_PROPERTY(bool showDirsFirst READ showDirsFirst WRITE setShowDirsFirst NOTIFY showDirsFirstChanged)
+
     // ScreenCast Specific
     Q_PROPERTY(uint availableSourceTypes READ availableSourceTypes WRITE setAvailableSourceTypes NOTIFY availableSourceTypesChanged)
     Q_PROPERTY(uint availableCursorModes READ availableCursorModes WRITE setAvailableCursorModes NOTIFY availableCursorModesChanged)
@@ -65,7 +78,8 @@ public:
         Access,
         Account,
         DynamicLauncher,
-        Wallpaper
+        Wallpaper,
+        FileChooser
     };
     Q_ENUM(DialogMode)
 
@@ -146,6 +160,42 @@ public:
     QString wallpaperSetOn() const { return m_wallpaperSetOn; }
     void setWallpaperSetOn(const QString& on);
 
+    // FileChooser properties
+    QString initialDirectory() const { return m_initialDirectory; }
+    void setInitialDirectory(const QString& dir);
+
+    QString filterLabel() const { return m_filterLabel; }
+    void setFilterLabel(const QString& label);
+
+    QStringList filters() const { return m_filters; }
+    void setFilters(const QStringList& filters);
+
+    bool directoryOnly() const { return m_directoryOnly; }
+    void setDirectoryOnly(bool dirOnly);
+
+    bool saveMode() const { return m_saveMode; }
+    void setSaveMode(bool save);
+
+    QString suggestedName() const { return m_suggestedName; }
+    void setSuggestedName(const QString& name);
+
+    bool showHidden() const { return m_showHidden; }
+    void setShowHidden(bool show);
+
+    int placesIconSize() const { return m_placesIconSize; }
+    void setPlacesIconSize(int size);
+
+    bool singleClick() const { return m_singleClick; }
+    void setSingleClick(bool single);
+
+    bool caseSensitiveSort() const { return m_caseSensitiveSort; }
+    void setCaseSensitiveSort(bool sensitive);
+
+    bool showDirsFirst() const { return m_showDirsFirst; }
+    void setShowDirsFirst(bool dirsFirst);
+
+    Q_INVOKABLE static bool fileExists(const QString& path);
+
     Q_INVOKABLE void accept(const QVariantMap& results = {});
     Q_INVOKABLE void reject();
     Q_INVOKABLE void quit();
@@ -180,6 +230,18 @@ signals:
     void launcherUrlChanged();
     void wallpaperUriChanged();
     void wallpaperSetOnChanged();
+
+    void initialDirectoryChanged();
+    void filterLabelChanged();
+    void filtersChanged();
+    void directoryOnlyChanged();
+    void saveModeChanged();
+    void suggestedNameChanged();
+    void showHiddenChanged();
+    void placesIconSizeChanged();
+    void singleClickChanged();
+    void caseSensitiveSortChanged();
+    void showDirsFirstChanged();
 
     void accepted(const QVariantMap& results);
     void rejected();
@@ -218,6 +280,19 @@ private:
     QString m_wallpaperUri;
     QString m_wallpaperSetOn = QStringLiteral("both");
     QImage m_screenCapture;
+
+    // FileChooser properties
+    QString m_initialDirectory;
+    QString m_filterLabel = QStringLiteral("All files");
+    QStringList m_filters = { QStringLiteral("*") };
+    bool m_directoryOnly = false;
+    bool m_saveMode = false;
+    QString m_suggestedName;
+    bool m_showHidden = false;
+    int m_placesIconSize = 20;
+    bool m_singleClick = false;
+    bool m_caseSensitiveSort = false;
+    bool m_showDirsFirst = true;
 };
 
 } // namespace wormhole::core

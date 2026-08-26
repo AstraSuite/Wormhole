@@ -21,6 +21,7 @@ find_package(Qt6 6.5 REQUIRED COMPONENTS
     Svg
     DBus
     Network
+    Multimedia
     Test
 )
 
@@ -77,6 +78,21 @@ qt_add_executable(wormhole_app
     src/core/appcontroller.hpp
     src/core/appcontroller.cpp
     src/core/iconprovider.hpp
+    src/core/fileutils.hpp
+    src/core/fileutils.cpp
+    src/core/trashlocations.hpp
+    src/core/trashlocations.cpp
+    src/core/recentfiles.hpp
+    src/core/recentfiles.cpp
+    src/core/placesmodel.hpp
+    src/core/placesmodel.cpp
+    src/core/drivemanager.hpp
+    src/core/drivemanager.cpp
+
+    src/core/thumbnailprovider.hpp
+    src/core/thumbnailprovider.cpp
+    src/models/filesystemmodel.hpp
+    src/models/filesystemmodel.cpp
     src/screencast/hyprlandipc.hpp
     src/screencast/hyprlandipc.cpp
     src/screencast/sourcesmodel.hpp
@@ -158,6 +174,7 @@ target_include_directories(wormhole_app PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/src/config
     ${CMAKE_CURRENT_SOURCE_DIR}/src/core
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/models
     ${CMAKE_CURRENT_SOURCE_DIR}/src/screencast
     ${CMAKE_CURRENT_SOURCE_DIR}/src/appchooser
     ${CMAKE_CURRENT_SOURCE_DIR}/src/portal
@@ -266,6 +283,7 @@ target_link_libraries(wormhole_app PRIVATE
     Qt6::Svg
     Qt6::DBus
     Qt6::Network
+    Qt6::Multimedia
     PkgConfig::PipeWire
     PkgConfig::WaylandClient
 )

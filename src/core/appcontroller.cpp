@@ -187,6 +187,87 @@ void AppController::setWallpaperSetOn(const QString& on) {
     }
 }
 
+void AppController::setInitialDirectory(const QString& dir) {
+    if (m_initialDirectory != dir) {
+        m_initialDirectory = dir;
+        emit initialDirectoryChanged();
+    }
+}
+
+void AppController::setFilterLabel(const QString& label) {
+    if (m_filterLabel != label) {
+        m_filterLabel = label;
+        emit filterLabelChanged();
+    }
+}
+
+void AppController::setFilters(const QStringList& filters) {
+    if (m_filters != filters) {
+        m_filters = filters;
+        emit filtersChanged();
+    }
+}
+
+void AppController::setDirectoryOnly(bool dirOnly) {
+    if (m_directoryOnly != dirOnly) {
+        m_directoryOnly = dirOnly;
+        emit directoryOnlyChanged();
+    }
+}
+
+void AppController::setSaveMode(bool save) {
+    if (m_saveMode != save) {
+        m_saveMode = save;
+        emit saveModeChanged();
+    }
+}
+
+void AppController::setSuggestedName(const QString& name) {
+    if (m_suggestedName != name) {
+        m_suggestedName = name;
+        emit suggestedNameChanged();
+    }
+}
+
+void AppController::setShowHidden(bool show) {
+    if (m_showHidden != show) {
+        m_showHidden = show;
+        emit showHiddenChanged();
+    }
+}
+
+void AppController::setPlacesIconSize(int size) {
+    if (m_placesIconSize != size && size > 0) {
+        m_placesIconSize = size;
+        emit placesIconSizeChanged();
+    }
+}
+
+void AppController::setSingleClick(bool single) {
+    if (m_singleClick != single) {
+        m_singleClick = single;
+        emit singleClickChanged();
+    }
+}
+
+void AppController::setCaseSensitiveSort(bool sensitive) {
+    if (m_caseSensitiveSort != sensitive) {
+        m_caseSensitiveSort = sensitive;
+        emit caseSensitiveSortChanged();
+    }
+}
+
+void AppController::setShowDirsFirst(bool dirsFirst) {
+    if (m_showDirsFirst != dirsFirst) {
+        m_showDirsFirst = dirsFirst;
+        emit showDirsFirstChanged();
+    }
+}
+
+bool AppController::fileExists(const QString& path) {
+    return QFileInfo::exists(path);
+}
+
 void AppController::accept(const QVariantMap& results) {
     emit accepted(results);
 }

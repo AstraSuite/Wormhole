@@ -16,25 +16,25 @@ FileChooserPortal::FileChooserPortal(QObject* parent)
     : QDBusAbstractAdaptor(parent) {
 }
 
-QString FileChooserPortal::findAtlasBinary() {
-    // Check if atlas is in same dir as wormhole
+QString FileChooserPortal::findWormholeBinary() {
+    // Check if wormhole is in same dir
     QString appDir = QCoreApplication::applicationDirPath();
-    if (QFile::exists(appDir + QStringLiteral("/atlas"))) {
-        return appDir + QStringLiteral("/atlas");
+    if (QFile::exists(appDir + QStringLiteral("/wormhole"))) {
+        return appDir + QStringLiteral("/wormhole");
     }
     // Check PATH
-    QString inPath = QStandardPaths::findExecutable(QStringLiteral("atlas"));
+    QString inPath = QStandardPaths::findExecutable(QStringLiteral("wormhole"));
     if (!inPath.isEmpty()) {
         return inPath;
     }
     // Check common prefixes
-    if (QFile::exists(QStringLiteral("/usr/bin/atlas"))) {
-        return QStringLiteral("/usr/bin/atlas");
+    if (QFile::exists(QStringLiteral("/usr/bin/wormhole"))) {
+        return QStringLiteral("/usr/bin/wormhole");
     }
-    if (QFile::exists(QStringLiteral("/usr/local/bin/atlas"))) {
-        return QStringLiteral("/usr/local/bin/atlas");
+    if (QFile::exists(QStringLiteral("/usr/local/bin/wormhole"))) {
+        return QStringLiteral("/usr/local/bin/wormhole");
     }
-    return QStringLiteral("atlas");
+    return QStringLiteral("wormhole");
 }
 
 QString FileChooserPortal::parseInitialDirectory(const QVariantMap& options) {
@@ -161,7 +161,7 @@ void FileChooserPortal::OpenFile(const QDBusObjectPath& handle,
     QString filterLabel;
     parseFilters(options, filters, filterLabel);
 
-    launchAtlasPicker(dialogTitle, initialDir, directoryOnly, filters, filterLabel, handle, message, false, {}, false, {}, multiple);
+    launchPicker(dialogTitle, initialDir, directoryOnly, filters, filterLabel, handle, message, false, {}, false, {}, multiple);
 }
 
 void FileChooserPortal::SaveFile(const QDBusObjectPath& handle,
@@ -184,7 +184,7 @@ void FileChooserPortal::SaveFile(const QDBusObjectPath& handle,
     QString filterLabel;
     parseFilters(options, filters, filterLabel);
 
-    launchAtlasPicker(dialogTitle, initialDir, false, filters, filterLabel, handle, message, false, {}, true, suggestedName);
+    launchPicker(dialogTitle, initialDir, false, filters, filterLabel, handle, message, false, {}, true, suggestedName);
 }
 
 void FileChooserPortal::SaveFiles(const QDBusObjectPath& handle,
@@ -213,24 +213,24 @@ void FileChooserPortal::SaveFiles(const QDBusObjectPath& handle,
         arg.endArray();
     }
 
-    launchAtlasPicker(dialogTitle, initialDir, true, { QStringLiteral("*") }, QStringLiteral("Folders"), handle, message, true, files);
+    launchPicker(dialogTitle, initialDir, true, { QStringLiteral("*") }, QStringLiteral("Folders"), handle, message, true, files);
 }
 
-void FileChooserPortal::launchAtlasPicker(const QString& title,
-                                         const QString& initialDir,
-                                         bool directoryOnly,
-                                         const QStringList& filters,
-                                         const QString& filterLabel,
-                                         const QDBusObjectPath& handle,
-                                         const QDBusMessage& message,
-                                         bool isSaveFiles,
-                                         const QStringList& fileList,
-                                         bool saveMode,
-                                         const QString& suggestedName,
-                                         bool multiple) {
-    QString atlasBin = findAtlasBinary();
+void FileChooserPortal::launchPicker(const QString& title,
+                                     const QString& initialDir,
+                                     bool directoryOnly,
+                                     const QStringList& filters,
+                                     const QString& filterLabel,
+                                     const QDBusObjectPath& handle,
+                                     const QDBusMessage& message,
+                                     bool isSaveFiles,
+                                     const QStringList& fileList,
+                                     bool saveMode,
+                                     const QString& suggestedName,
+                                     bool multiple) {
+    QString wormholeBin = findWormholeBinary();
     QStringList args;
-    args << QStringLiteral("--picker");
+    args << QStringLiteral("--file-chooser");
     args << QStringLiteral("--title") << title;
 
     if (!initialDir.isEmpty()) {
@@ -332,7 +332,7 @@ void FileChooserPortal::launchAtlasPicker(const QString& title,
         QDBusConnection::sessionBus().send(reply);
     });
 
-    process->start(atlasBin, args);
+    process->start(wormholeBin, args);
 }
 
 } // namespace wormhole::portal

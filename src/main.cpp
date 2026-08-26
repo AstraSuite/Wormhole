@@ -16,6 +16,10 @@
 #include "config/tokens.hpp"
 #include "core/appcontroller.hpp"
 #include "core/iconprovider.hpp"
+#include "core/fileutils.hpp"
+#include "core/placesmodel.hpp"
+#include "core/drivemanager.hpp"
+#include "core/thumbnailprovider.hpp"
 #include "screencast/previewprovider.hpp"
 #include "portal/portaldaemon.hpp"
 #include "portal/filechooserportal.hpp"
@@ -79,7 +83,7 @@ int main(int argc, char* argv[]) {
     QCommandLineOption daemonOpt(QStringList{ "d", "daemon" }, "Run as D-Bus portal daemon");
     QCommandLineOption screencastOpt("screencast", "Open ScreenCast source chooser");
     QCommandLineOption screenshotOpt("screenshot", "Open Screenshot capture overlay");
-    QCommandLineOption fileChooserOpt(QStringList{ "file-chooser", "filechooser" }, "Open File Chooser via Atlas picker");
+    QCommandLineOption fileChooserOpt(QStringList{ "file-chooser", "filechooser" }, "Open embedded File Chooser dialog");
     QCommandLineOption pickColorOpt("pick-color", "Open Color Picker");
     QCommandLineOption appChooserOpt(QStringList{ "appchooser", "app-chooser" }, "Open Application Chooser");
     QCommandLineOption accessOpt("access", "Open Permission Access dialog");
@@ -140,86 +144,64 @@ int main(int argc, char* argv[]) {
 
     parser.process(app);
 
-    // Handle File Chooser directly via Atlas delegation
-    if (parser.isSet(fileChooserOpt)) {
-        QString atlas = wormhole::portal::FileChooserPortal::findAtlasBinary();
-        QStringList args;
-        args << QStringLiteral("--picker");
-        if (parser.isSet(titleOpt)) {
-            args << QStringLiteral("--title") << parser.value(titleOpt);
-        }
-        if (parser.isSet(multipleOpt)) {
-            args << QStringLiteral("--multiple");
-        }
-        if (parser.isSet(directoryOpt)) {
-            args << QStringLiteral("--directory");
-        }
-        if (parser.isSet(saveOpt)) {
-            args << QStringLiteral("--save");
-        }
-        if (parser.isSet(urlOpt)) {
-            args << QStringLiteral("--folder") << parser.value(urlOpt);
-        }
-
-        QProcess proc;
-        proc.start(atlas, args);
-        proc.waitForFinished(-1);
-
-        QByteArray out = proc.readAllStandardOutput();
-        if (!out.isEmpty()) {
-            std::cout << out.toStdString();
-        }
-        return proc.exitCode();
-    }
-
     auto* controller = wormhole::core::AppController::instance();
 
-    if (parser.isSet(typesOpt)) controller->setAvailableSourceTypes(parser.value(typesOpt).toUInt());
-    if (parser.isSet(multipleOpt)) controller->setMultipleSources(true);
-    if (parser.isSet(titleOpt)) controller->setTitle(parser.value(titleOpt));
-    if (parser.isSet(appIdOpt)) controller->setAppId(parser.value(appIdOpt));
-    if (parser.isSet(parentWinOpt)) controller->setParentWindow(parser.value(parentWinOpt));
-    if (parser.isSet(cursorModeOpt)) controller->setCursorMode(parser.value(cursorModeOpt).toUInt());
-    if (parser.isSet(persistModeOpt)) controller->setAllowToken(parser.value(persistModeOpt).toUInt() != 0);
-    if (parser.isSet(urlOpt)) {
-        controller->setWallpaperUri(parser.value(urlOpt));
-        controller->setLauncherUrl(parser.value(urlOpt));
-        controller->setAppChooserUrl(parser.value(urlOpt));
-    }
-    if (parser.isSet(nameOpt)) controller->setLauncherName(parser.value(nameOpt));
-    if (parser.isSet(execOpt)) controller->setLauncherExec(parser.value(execOpt));
-    if (parser.isSet(iconOpt)) {
-        controller->setAccessIcon(parser.value(iconOpt));
-        controller->setLauncherIcon(parser.value(iconOpt));
-    }
-    if (parser.isSet(subtitleOpt)) controller->setAccessSubtitle(parser.value(subtitleOpt));
-    if (parser.isSet(bodyOpt)) controller->setAccessBody(parser.value(bodyOpt));
-    if (parser.isSet(mimeOpt)) controller->setAppChooserMime(parser.value(mimeOpt));
-    if (parser.isSet(choicesOpt)) controller->setAppChooserChoices(parser.value(choicesOpt).split(QLatin1Char(','), Qt::SkipEmptyParts));
-    if (parser.isSet(interactiveOpt)) controller->setIsScreenshotInteractive(true);
-    if (parser.isSet(delayOpt)) controller->setScreenshotDelay(parser.value(delayOpt).toInt());
-
-    if (parser.isSet(screencastOpt)) {
-        controller->setDialogMode(wormhole::core::AppController::DialogMode::ScreenCast);
-    } else if (parser.isSet(screenshotOpt)) {
-        controller->setDialogMode(wormhole::core::AppController::DialogMode::Screenshot);
-        controller->setIsPickColorMode(false);
-    } else if (parser.isSet(pickColorOpt)) {
-        controller->setDialogMode(wormhole::core::AppController::DialogMode::Screenshot);
-        controller->setIsPickColorMode(true);
-    } else if (parser.isSet(appChooserOpt)) {
-        controller->setDialogMode(wormhole::core::AppController::DialogMode::AppChooser);
-    } else if (parser.isSet(accessOpt)) {
-        controller->setDialogMode(wormhole::core::AppController::DialogMode::Access);
-    } else if (parser.isSet(accountOpt)) {
-        controller->setDialogMode(wormhole::core::AppController::DialogMode::Account);
-    } else if (parser.isSet(dynamicLauncherOpt)) {
-        controller->setDialogMode(wormhole::core::AppController::DialogMode::DynamicLauncher);
-    } else if (parser.isSet(wallpaperOpt)) {
-        controller->setDialogMode(wormhole::core::AppController::DialogMode::Wallpaper);
+    // Handle File Chooser directly via embedded picker
+    if (parser.isSet(fileChooserOpt)) {
+        controller->setDialogMode(wormhole::core::AppController::DialogMode::FileChooser);
+        if (parser.isSet(titleOpt)) controller->setTitle(parser.value(titleOpt));
+        if (parser.isSet(directoryOpt)) controller->setInitialDirectory(parser.value(directoryOpt));
+        if (parser.isSet(multipleOpt)) controller->setSaveMode(false);
+        if (parser.isSet(saveOpt)) controller->setSaveMode(true);
+        if (parser.isSet(urlOpt)) controller->setInitialDirectory(parser.value(urlOpt));
     } else {
-        // Default to ScreenCast picker
-        controller->setDialogMode(wormhole::core::AppController::DialogMode::ScreenCast);
+        if (parser.isSet(typesOpt)) controller->setAvailableSourceTypes(parser.value(typesOpt).toUInt());
+        if (parser.isSet(multipleOpt)) controller->setMultipleSources(true);
+        if (parser.isSet(titleOpt)) controller->setTitle(parser.value(titleOpt));
+        if (parser.isSet(appIdOpt)) controller->setAppId(parser.value(appIdOpt));
+        if (parser.isSet(parentWinOpt)) controller->setParentWindow(parser.value(parentWinOpt));
+        if (parser.isSet(cursorModeOpt)) controller->setCursorMode(parser.value(cursorModeOpt).toUInt());
+        if (parser.isSet(persistModeOpt)) controller->setAllowToken(parser.value(persistModeOpt).toUInt() != 0);
+        if (parser.isSet(urlOpt)) {
+            controller->setWallpaperUri(parser.value(urlOpt));
+            controller->setLauncherUrl(parser.value(urlOpt));
+            controller->setAppChooserUrl(parser.value(urlOpt));
+        }
+        if (parser.isSet(nameOpt)) controller->setLauncherName(parser.value(nameOpt));
+        if (parser.isSet(execOpt)) controller->setLauncherExec(parser.value(execOpt));
+        if (parser.isSet(iconOpt)) {
+            controller->setAccessIcon(parser.value(iconOpt));
+            controller->setLauncherIcon(parser.value(iconOpt));
+        }
+        if (parser.isSet(subtitleOpt)) controller->setAccessSubtitle(parser.value(subtitleOpt));
+        if (parser.isSet(bodyOpt)) controller->setAccessBody(parser.value(bodyOpt));
+        if (parser.isSet(mimeOpt)) controller->setAppChooserMime(parser.value(mimeOpt));
+        if (parser.isSet(choicesOpt)) controller->setAppChooserChoices(parser.value(choicesOpt).split(QLatin1Char(','), Qt::SkipEmptyParts));
+        if (parser.isSet(interactiveOpt)) controller->setIsScreenshotInteractive(true);
+        if (parser.isSet(delayOpt)) controller->setScreenshotDelay(parser.value(delayOpt).toInt());
+
+        if (parser.isSet(screencastOpt)) {
+            controller->setDialogMode(wormhole::core::AppController::DialogMode::ScreenCast);
+        } else if (parser.isSet(screenshotOpt)) {
+            controller->setDialogMode(wormhole::core::AppController::DialogMode::Screenshot);
+            controller->setIsPickColorMode(false);
+        } else if (parser.isSet(pickColorOpt)) {
+            controller->setDialogMode(wormhole::core::AppController::DialogMode::Screenshot);
+            controller->setIsPickColorMode(true);
+        } else if (parser.isSet(appChooserOpt)) {
+            controller->setDialogMode(wormhole::core::AppController::DialogMode::AppChooser);
+        } else if (parser.isSet(accessOpt)) {
+            controller->setDialogMode(wormhole::core::AppController::DialogMode::Access);
+        } else if (parser.isSet(accountOpt)) {
+            controller->setDialogMode(wormhole::core::AppController::DialogMode::Account);
+        } else if (parser.isSet(dynamicLauncherOpt)) {
+            controller->setDialogMode(wormhole::core::AppController::DialogMode::DynamicLauncher);
+        } else if (parser.isSet(wallpaperOpt)) {
+            controller->setDialogMode(wormhole::core::AppController::DialogMode::Wallpaper);
+        } else {
+            // Default to ScreenCast picker
+            controller->setDialogMode(wormhole::core::AppController::DialogMode::ScreenCast);
+        }
     }
 
     // Connect stdout results
@@ -237,6 +219,18 @@ int main(int argc, char* argv[]) {
             }
         }
 
+        if (controller->dialogMode() == wormhole::core::AppController::DialogMode::FileChooser) {
+            // Print file URIs to stdout for CLI usage
+            if (results.contains(QStringLiteral("uris"))) {
+                const QStringList uris = results.value(QStringLiteral("uris")).toStringList();
+                for (const QString& uri : uris) {
+                    std::cout << uri.toStdString() << std::endl;
+                }
+            }
+            QGuiApplication::exit(0);
+            return;
+        }
+
         QJsonDocument doc = QJsonDocument::fromVariant(results);
         std::cout << doc.toJson(QJsonDocument::Compact).toStdString() << std::endl;
         QGuiApplication::exit(0);
@@ -252,10 +246,16 @@ int main(int argc, char* argv[]) {
     QQmlApplicationEngine engine;
     engine.addImageProvider(QStringLiteral("icon"), new wormhole::core::IconImageProvider());
     engine.addImageProvider(QStringLiteral("monitor"), new wormhole::screencast::ScreenPreviewProvider());
+    engine.addImageProvider(QStringLiteral("thumb"), new wormhole::core::ThumbnailImageProvider());
+
+    auto* fileUtils = new wormhole::core::FileUtils(&app);
+    auto* driveManager = new wormhole::core::DriveManager(&app);
 
     engine.rootContext()->setContextProperty(QStringLiteral("Colours"), colours);
     engine.rootContext()->setContextProperty(QStringLiteral("Tokens"), tokens);
     engine.rootContext()->setContextProperty(QStringLiteral("AppController"), controller);
+    engine.rootContext()->setContextProperty(QStringLiteral("FileUtils"), fileUtils);
+    engine.rootContext()->setContextProperty(QStringLiteral("DriveManager"), driveManager);
 
     const QUrl url(QStringLiteral("qrc:/qt/qml/wormhole/qml/main.qml"));
     QObject::connect(
