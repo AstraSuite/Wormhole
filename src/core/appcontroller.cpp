@@ -264,6 +264,13 @@ void AppController::setShowDirsFirst(bool dirsFirst) {
     }
 }
 
+void AppController::setPortalHandle(const QString& handle) {
+    if (m_portalHandle != handle) {
+        m_portalHandle = handle;
+        emit portalHandleChanged();
+    }
+}
+
 bool AppController::fileExists(const QString& path) {
     return QFileInfo::exists(path);
 }
@@ -278,6 +285,10 @@ void AppController::reject() {
 
 void AppController::quit() {
     QCoreApplication::quit();
+}
+
+void AppController::finishPortalRequest(const QString& handlePath, quint32 response, const QVariantMap& results) {
+    emit portalRequestFinished(handlePath, response, results);
 }
 
 void AppController::captureScreen() {

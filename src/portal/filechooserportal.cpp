@@ -1,40 +1,16 @@
 #include "filechooserportal.hpp"
-#include <QCoreApplication>
 #include <QDBusArgument>
 #include <QDebug>
 #include <QDir>
-#include <QFile>
 #include <QFileInfo>
 #include <QMimeDatabase>
 #include <QMimeType>
-#include <QStandardPaths>
 #include <QUrl>
 
 namespace wormhole::portal {
 
 FileChooserPortal::FileChooserPortal(QObject* parent)
     : QDBusAbstractAdaptor(parent) {
-}
-
-QString FileChooserPortal::findWormholeBinary() {
-    // Check if wormhole is in same dir
-    QString appDir = QCoreApplication::applicationDirPath();
-    if (QFile::exists(appDir + QStringLiteral("/wormhole"))) {
-        return appDir + QStringLiteral("/wormhole");
-    }
-    // Check PATH
-    QString inPath = QStandardPaths::findExecutable(QStringLiteral("wormhole"));
-    if (!inPath.isEmpty()) {
-        return inPath;
-    }
-    // Check common prefixes
-    if (QFile::exists(QStringLiteral("/usr/bin/wormhole"))) {
-        return QStringLiteral("/usr/bin/wormhole");
-    }
-    if (QFile::exists(QStringLiteral("/usr/local/bin/wormhole"))) {
-        return QStringLiteral("/usr/local/bin/wormhole");
-    }
-    return QStringLiteral("wormhole");
 }
 
 QString FileChooserPortal::parseInitialDirectory(const QVariantMap& options) {
@@ -152,6 +128,19 @@ void FileChooserPortal::OpenFile(const QDBusObjectPath& handle,
                                  const QDBusMessage& message) {
     message.setDelayedReply(true);
 
+    QString handleStr = handle.path();
+    auto* reqObj = new PortalRequest(handleStr, this);
+
+    PendingRequest req;
+    req.message = message;
+    req.requestObject = reqObj;
+    qDebug() << "OpenFile: handle.path()=" << handleStr << "title=" << title;
+    m_requests.insert(handleStr, req);
+
+    connect(reqObj, &PortalRequest::closeRequested, this, [this, handleStr]() {
+        cleanupRequest(handleStr);
+    });
+
     QString dialogTitle = title.isEmpty() ? QStringLiteral("Open File") : title;
     QString initialDir = parseInitialDirectory(options);
     bool directoryOnly = options.value(QStringLiteral("directory"), false).toBool();
@@ -161,7 +150,7 @@ void FileChooserPortal::OpenFile(const QDBusObjectPath& handle,
     QString filterLabel;
     parseFilters(options, filters, filterLabel);
 
-    launchPicker(dialogTitle, initialDir, directoryOnly, filters, filterLabel, handle, message, false, {}, false, {}, multiple);
+    emit openFileRequested(handle.path(), dialogTitle, filters, filterLabel, directoryOnly, multiple, initialDir);
 }
 
 void FileChooserPortal::SaveFile(const QDBusObjectPath& handle,
@@ -171,6 +160,18 @@ void FileChooserPortal::SaveFile(const QDBusObjectPath& handle,
                                  const QVariantMap& options,
                                  const QDBusMessage& message) {
     message.setDelayedReply(true);
+
+    QString handleStr = handle.path();
+    auto* reqObj = new PortalRequest(handleStr, this);
+
+    PendingRequest req;
+    req.message = message;
+    req.requestObject = reqObj;
+    m_requests.insert(handleStr, req);
+
+    connect(reqObj, &PortalRequest::closeRequested, this, [this, handleStr]() {
+        cleanupRequest(handleStr);
+    });
 
     QString dialogTitle = title.isEmpty() ? QStringLiteral("Save File") : title;
     QString initialDir = parseInitialDirectory(options);
@@ -184,16 +185,28 @@ void FileChooserPortal::SaveFile(const QDBusObjectPath& handle,
     QString filterLabel;
     parseFilters(options, filters, filterLabel);
 
-    launchPicker(dialogTitle, initialDir, false, filters, filterLabel, handle, message, false, {}, true, suggestedName);
+    emit saveFileRequested(handle.path(), dialogTitle, filters, filterLabel, suggestedName, initialDir);
 }
 
 void FileChooserPortal::SaveFiles(const QDBusObjectPath& handle,
-                                  const QString& /*app_id*/,
-                                  const QString& /*parent_window*/,
-                                  const QString& title,
-                                  const QVariantMap& options,
-                                  const QDBusMessage& message) {
+                                   const QString& /*app_id*/,
+                                   const QString& /*parent_window*/,
+                                   const QString& title,
+                                   const QVariantMap& options,
+                                   const QDBusMessage& message) {
     message.setDelayedReply(true);
+
+    QString handleStr = handle.path();
+    auto* reqObj = new PortalRequest(handleStr, this);
+
+    PendingRequest req;
+    req.message = message;
+    req.requestObject = reqObj;
+    m_requests.insert(handleStr, req);
+
+    connect(reqObj, &PortalRequest::closeRequested, this, [this, handleStr]() {
+        cleanupRequest(handleStr);
+    });
 
     QString dialogTitle = title.isEmpty() ? QStringLiteral("Save Files") : title;
     QString initialDir = parseInitialDirectory(options);
@@ -213,126 +226,70 @@ void FileChooserPortal::SaveFiles(const QDBusObjectPath& handle,
         arg.endArray();
     }
 
-    launchPicker(dialogTitle, initialDir, true, { QStringLiteral("*") }, QStringLiteral("Folders"), handle, message, true, files);
+    emit saveFilesRequested(handle.path(), dialogTitle, files, initialDir);
 }
 
-void FileChooserPortal::launchPicker(const QString& title,
-                                     const QString& initialDir,
-                                     bool directoryOnly,
-                                     const QStringList& filters,
-                                     const QString& filterLabel,
-                                     const QDBusObjectPath& handle,
-                                     const QDBusMessage& message,
-                                     bool isSaveFiles,
-                                     const QStringList& fileList,
-                                     bool saveMode,
-                                     const QString& suggestedName,
-                                     bool multiple) {
-    QString wormholeBin = findWormholeBinary();
-    QStringList args;
-    args << QStringLiteral("--file-chooser");
-    args << QStringLiteral("--title") << title;
-
-    if (!initialDir.isEmpty()) {
-        args << QStringLiteral("--directory") << initialDir;
-    }
-    if (directoryOnly) {
-        args << QStringLiteral("--directory-only");
-    }
-    if (multiple) {
-        args << QStringLiteral("--multiple");
-    }
-    if (saveMode) {
-        args << QStringLiteral("--save");
-        if (!suggestedName.isEmpty()) {
-            args << QStringLiteral("--name") << suggestedName;
-        }
-    }
-    if (!filters.isEmpty() && !filters.contains(QStringLiteral("*"))) {
-        args << QStringLiteral("--filter") << filters.join(QLatin1Char(','));
-    }
-    if (!filterLabel.isEmpty()) {
-        args << QStringLiteral("--filter-label") << filterLabel;
+void FileChooserPortal::finishRequest(const QString& handlePath, quint32 response, const QVariantMap& results) {
+    qDebug() << "finishRequest: handlePath=" << handlePath << "response=" << response;
+    if (!m_requests.contains(handlePath)) {
+        qWarning() << "finishRequest: no pending request for" << handlePath;
+        return;
     }
 
-    auto* process = new QProcess(this);
-    auto* reqObj = new PortalRequest(handle.path(), this);
-
-    PendingRequest req;
-    req.message = message;
-    req.process = process;
-    req.requestObject = reqObj;
-    req.isSaveFiles = isSaveFiles;
-    req.fileListToSave = fileList;
-
-    m_requests.insert(handle.path(), req);
-
-    connect(reqObj, &PortalRequest::closeRequested, this, [this, handle]() {
-        if (m_requests.contains(handle.path())) {
-            auto r = m_requests.take(handle.path());
-            if (r.process && r.process->state() != QProcess::NotRunning) {
-                r.process->terminate();
-            }
-            if (r.requestObject) r.requestObject->deleteLater();
-            if (r.process) r.process->deleteLater();
-
-            QDBusMessage reply = r.message.createReply();
-            reply << static_cast<uint>(1) << QVariantMap();
-            QDBusConnection::sessionBus().send(reply);
-        }
-    });
-
-    connect(process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
-            this, [this, handle](int exitCode, QProcess::ExitStatus exitStatus) {
-        if (!m_requests.contains(handle.path())) {
-            return;
-        }
-        auto req = m_requests.take(handle.path());
-        QByteArray stdoutData = req.process->readAllStandardOutput();
-
-        if (req.requestObject) req.requestObject->deleteLater();
-        if (req.process) req.process->deleteLater();
-
-        QDBusMessage reply = req.message.createReply();
-        QVariantMap results;
-
-        if (exitStatus == QProcess::CrashExit) {
-            qWarning() << "wormhole: the file picker crashed with signal" << exitCode
-                       << "- reporting an error rather than a cancellation";
-            reply << static_cast<uint>(2) << results;
-            QDBusConnection::sessionBus().send(reply);
-            return;
-        }
-
-        if (exitCode == 0 && !stdoutData.isEmpty()) {
-            QString output = QString::fromUtf8(stdoutData).trimmed();
-            QStringList lines = output.split(QLatin1Char('\n'), Qt::SkipEmptyParts);
-            QStringList uris;
-
-            for (const QString& line : lines) {
-                QString trimmed = line.trimmed();
-                if (trimmed.startsWith(QLatin1String("file://"))) {
-                    uris << trimmed;
-                } else if (!trimmed.isEmpty() && QDir::isAbsolutePath(trimmed)) {
-                    uris << QUrl::fromLocalFile(trimmed).toString(QUrl::FullyEncoded);
-                }
-            }
-
-            if (!uris.isEmpty()) {
-                results.insert(QStringLiteral("uris"), uris);
-                reply << static_cast<uint>(0) << results;
+    // Sanitize results: ensure all URIs are properly formatted file:// strings
+    QVariantMap sanitizedResults = results;
+    if (sanitizedResults.contains(QStringLiteral("uris"))) {
+        QStringList formattedUris;
+        const QStringList rawUris = sanitizedResults.value(QStringLiteral("uris")).toStringList();
+        for (const QString& item : rawUris) {
+            if (item.startsWith(QLatin1String("file://"))) {
+                formattedUris.append(item);
             } else {
-                reply << static_cast<uint>(1) << results;
+                formattedUris.append(QUrl::fromLocalFile(item).toString());
             }
-        } else {
-            // Cancelled or error
-            reply << static_cast<uint>(1) << results;
         }
+        sanitizedResults.insert(QStringLiteral("uris"), formattedUris);
+    }
 
+    sendResponse(handlePath, response, sanitizedResults);
+}
+
+void FileChooserPortal::sendResponse(const QString& handlePath, quint32 response, const QVariantMap& results) {
+    if (!m_requests.contains(handlePath)) {
+        qWarning() << "sendResponse: no pending request for" << handlePath;
+        return;
+    }
+    PendingRequest req = m_requests.take(handlePath);
+
+    // 1. Emit the Response signal expected by xdg-desktop-portal
+    QDBusMessage responseSignal = QDBusMessage::createSignal(
+        handlePath,
+        QStringLiteral("org.freedesktop.impl.portal.Request"),
+        QStringLiteral("Response")
+    );
+    responseSignal << static_cast<uint>(response) << results;
+    QDBusConnection::sessionBus().send(responseSignal);
+
+    // 2. Reply to the initial D-Bus method call
+    if (req.message.isDelayedReply()) {
+        QDBusMessage reply = req.message.createReply();
+        reply << static_cast<uint>(response) << results;
         QDBusConnection::sessionBus().send(reply);
-    });
+    }
 
-    process->start(wormholeBin, args);
+    qDebug() << "sendResponse: Response signal and method reply sent for" << handlePath << "response=" << response;
+
+    // 3. Clean up the request object asynchronously
+    if (req.requestObject) {
+        req.requestObject->setParent(nullptr);
+        QMetaObject::invokeMethod(req.requestObject, &QObject::deleteLater, Qt::QueuedConnection);
+    }
+}
+
+void FileChooserPortal::cleanupRequest(const QString& handlePath) {
+    if (m_requests.contains(handlePath)) {
+        sendResponse(handlePath, 1, QVariantMap());
+    }
 }
 
 } // namespace wormhole::portal

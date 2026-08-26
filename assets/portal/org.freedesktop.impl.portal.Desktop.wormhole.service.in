@@ -1,4 +1,4 @@
 [D-BUS Service]
-Name=org.freedesktop.impl.portal.desktop.wormhole
+Name=org.freedesktop.impl.portal.Desktop.wormhole
 Exec=@WORMHOLE_BIN@ --daemon
 SystemdService=xdg-desktop-portal-wormhole.service

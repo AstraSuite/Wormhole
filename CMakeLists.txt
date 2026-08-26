@@ -301,12 +301,12 @@ install(FILES assets/portal/wormhole.portal
 set(WORMHOLE_BIN "${CMAKE_INSTALL_FULL_BINDIR}/wormhole")
 
 configure_file(
-    assets/portal/org.freedesktop.impl.portal.desktop.wormhole.service.in
-    "${CMAKE_CURRENT_BINARY_DIR}/org.freedesktop.impl.portal.desktop.wormhole.service"
+    assets/portal/org.freedesktop.impl.portal.Desktop.wormhole.service.in
+    "${CMAKE_CURRENT_BINARY_DIR}/org.freedesktop.impl.portal.Desktop.wormhole.service"
     @ONLY
 )
 
-install(FILES "${CMAKE_CURRENT_BINARY_DIR}/org.freedesktop.impl.portal.desktop.wormhole.service"
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/org.freedesktop.impl.portal.Desktop.wormhole.service"
     DESTINATION ${CMAKE_INSTALL_DATADIR}/dbus-1/services
 )
 

@@ -5,7 +5,7 @@ After=graphical-session.target
 
 [Service]
 Type=dbus
-BusName=org.freedesktop.impl.portal.desktop.wormhole
+BusName=org.freedesktop.impl.portal.Desktop.wormhole
 ExecStart=@WORMHOLE_BIN@ --daemon
 Restart=on-failure
 

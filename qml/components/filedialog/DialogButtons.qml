@@ -194,16 +194,23 @@ StyledRect {
                     ? root.dialog.saveName.trim().length === 0
                     : !root.dialog.selectionValid
                 onClicked: {
+                    console.log("SELECT CLICKED: saveMode=", root.dialog.saveMode,
+                                "selectionValid=", root.dialog.selectionValid,
+                                "directoryOnly=", root.dialog.directoryOnly,
+                                "disabled=", disabled)
                     if (root.dialog.saveMode) {
                         root.commitSave();
                     } else if (root.dialog.selectionValid) {
                         if (root.dialog.directoryOnly) {
                             if (root.folder && root.folder.currentItem && root.folder.currentItem.modelData && root.folder.currentItem.modelData.isDir) {
+                                console.log("SELECT: accepting folder path:", root.folder.currentItem.modelData.path)
                                 root.dialog.accepted(root.folder.currentItem.modelData.path);
                             } else {
+                                console.log("SELECT: accepting currentPath:", root.dialog.currentPath)
                                 root.dialog.accepted(root.dialog.currentPath);
                             }
                         } else if (root.folder && root.folder.currentItem && root.folder.currentItem.modelData) {
+                            console.log("SELECT: accepting file path:", root.folder.currentItem.modelData.path)
                             root.dialog.accepted(root.folder.currentItem.modelData.path);
                         }
                     }
@@ -242,6 +249,7 @@ StyledRect {
 
             StateLayer {
                 onClicked: {
+                    console.log("CANCEL CLICKED")
                     root.dialog.rejected();
                 }
             }

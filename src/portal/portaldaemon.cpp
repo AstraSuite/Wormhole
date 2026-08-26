@@ -3,6 +3,7 @@
 #include <QDBusConnectionInterface>
 #include <QDBusError>
 #include <QDebug>
+#include "appcontroller.hpp"
 
 namespace wormhole::portal {
 
@@ -17,18 +18,8 @@ bool PortalDaemon::start() {
         return false;
     }
 
-    const QString serviceName = QStringLiteral("org.freedesktop.impl.portal.desktop.wormhole");
-    auto* iface = bus.interface();
-    if (iface) {
-        auto reply = iface->registerService(serviceName,
-                                            QDBusConnectionInterface::ReplaceExistingService,
-                                            QDBusConnectionInterface::AllowReplacement);
-        if (reply != QDBusConnectionInterface::ServiceRegistered &&
-            reply != QDBusConnectionInterface::ServiceQueued) {
-            qCritical() << "Failed to register D-Bus service" << serviceName;
-            return false;
-        }
-    } else if (!bus.registerService(serviceName)) {
+    const QString serviceName = QStringLiteral("org.freedesktop.impl.portal.Desktop.wormhole");
+    if (!bus.registerService(serviceName)) {
         QDBusError error = bus.lastError();
         qCritical() << "Failed to register D-Bus service" << serviceName << ":" << error.message();
         return false;
@@ -67,6 +58,56 @@ bool PortalDaemon::start() {
         qCritical() << "Failed to register root portal object on" << objectPath << ":" << error.message();
         return false;
     }
+
+    auto* ctrl = wormhole::core::AppController::instance();
+
+    connect(m_fileChooser, &FileChooserPortal::openFileRequested,
+            ctrl, [ctrl](const QString& handle, const QString& title,
+                         const QStringList& filters, const QString& filterLabel,
+                         bool directoryOnly, bool multiple, const QString& initialDir) {
+        ctrl->setDialogMode(wormhole::core::AppController::DialogMode::FileChooser);
+        ctrl->setPortalHandle(handle);
+        ctrl->setTitle(title);
+        ctrl->setFilters(filters);
+        ctrl->setFilterLabel(filterLabel);
+        ctrl->setDirectoryOnly(directoryOnly);
+        ctrl->setInitialDirectory(initialDir);
+        ctrl->setSaveMode(false);
+    });
+
+    connect(m_fileChooser, &FileChooserPortal::saveFileRequested,
+            ctrl, [ctrl](const QString& handle, const QString& title,
+                         const QStringList& filters, const QString& filterLabel,
+                         const QString& suggestedName, const QString& initialDir) {
+        ctrl->setDialogMode(wormhole::core::AppController::DialogMode::FileChooser);
+        ctrl->setPortalHandle(handle);
+        ctrl->setTitle(title);
+        ctrl->setFilters(filters);
+        ctrl->setFilterLabel(filterLabel);
+        ctrl->setSuggestedName(suggestedName);
+        ctrl->setInitialDirectory(initialDir);
+        ctrl->setSaveMode(true);
+    });
+
+    connect(m_fileChooser, &FileChooserPortal::saveFilesRequested,
+            ctrl, [ctrl](const QString& handle, const QString& title,
+                         const QStringList& fileList, const QString& initialDir) {
+        Q_UNUSED(fileList)
+        ctrl->setDialogMode(wormhole::core::AppController::DialogMode::FileChooser);
+        ctrl->setPortalHandle(handle);
+        ctrl->setTitle(title);
+        ctrl->setInitialDirectory(initialDir);
+        ctrl->setDirectoryOnly(true);
+        ctrl->setSaveMode(true);
+    });
+
+    connect(ctrl, &wormhole::core::AppController::portalRequestFinished,
+            m_fileChooser, &FileChooserPortal::finishRequest);
+
+    connect(m_fileChooser, &FileChooserPortal::openFileRequested,
+            this, [](const QString& handle) {
+        qDebug() << "openFileRequested received in PortalDaemon: handle=" << handle;
+    });
 
     qInfo() << "Wormhole portal daemon registered successfully on" << serviceName << "at" << objectPath;
     return true;

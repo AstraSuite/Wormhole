@@ -11,9 +11,10 @@ Window {
     id: window
 
     readonly property bool isFullscreenOverlay: AppController.dialogMode === AppController.Screenshot
+    readonly property bool isDaemon: AppController.dialogMode === AppController.None
     readonly property bool isDark: !Colours.light
 
-    visible: true
+    visible: AppController.dialogMode !== AppController.None
     title: AppController.title.length > 0 ? AppController.title : qsTr("Wormhole")
     color: isFullscreenOverlay ? "transparent" : Colours.tPalette.m3surface
 
@@ -35,7 +36,23 @@ Window {
         return 520;
     }
 
-    // Centering window
+    function finishDialog(results, status) {
+        console.log("finishDialog called: status=", status, "portalHandle=", AppController.portalHandle, "results=", JSON.stringify(results))
+        if (AppController.portalHandle.length > 0) {
+            console.log("finishDialog: calling finishPortalRequest")
+            AppController.finishPortalRequest(AppController.portalHandle, status, results);
+            AppController.portalHandle = "";
+            AppController.dialogMode = AppController.None;
+        } else {
+            console.log("finishDialog: standalone mode")
+            if (status === 0)
+                AppController.accept(results);
+            else
+                AppController.reject();
+            Qt.quit();
+        }
+    }
+
     Component.onCompleted: {
         if (isFullscreenOverlay) {
             window.showFullScreen();
@@ -45,13 +62,19 @@ Window {
         }
     }
 
+    onVisibleChanged: {
+        if (visible && !isFullscreenOverlay) {
+            window.x = (Screen.width - window.width) / 2;
+            window.y = (Screen.height - window.height) / 2;
+        }
+    }
+
     Shortcut {
         sequence: "Escape"
-        enabled: true
+        enabled: window.visible
         context: Qt.ApplicationShortcut
         onActivated: {
-            AppController.reject();
-            Qt.quit();
+            finishDialog({}, 1);
         }
     }
 
@@ -78,7 +101,7 @@ Window {
             case AppController.FileChooser:
                 return fileChooserComp;
             default:
-                return screenChooserComp;
+                return null;
             }
         }
     }
@@ -86,98 +109,56 @@ Window {
     Component {
         id: screenChooserComp
         ScreenChooserDialog {
-            onAccepted: (result) => {
-                AppController.accept(result);
-                Qt.quit();
-            }
-            onRejected: {
-                AppController.reject();
-                Qt.quit();
-            }
+            onAccepted: (result) => window.finishDialog(result, 0)
+            onRejected: window.finishDialog({}, 1)
         }
     }
 
     Component {
         id: screenshotComp
         ScreenshotDialog {
-            onAccepted: (result) => {
-                AppController.accept(result);
-                Qt.quit();
-            }
-            onRejected: {
-                AppController.reject();
-                Qt.quit();
-            }
+            onAccepted: (result) => window.finishDialog(result, 0)
+            onRejected: window.finishDialog({}, 1)
         }
     }
 
     Component {
         id: appChooserComp
         AppChooserDialog {
-            onAccepted: (result) => {
-                AppController.accept(result);
-                Qt.quit();
-            }
-            onRejected: {
-                AppController.reject();
-                Qt.quit();
-            }
+            onAccepted: (result) => window.finishDialog(result, 0)
+            onRejected: window.finishDialog({}, 1)
         }
     }
 
     Component {
         id: accessComp
         AccessDialog {
-            onAccepted: (result) => {
-                AppController.accept(result);
-                Qt.quit();
-            }
-            onRejected: {
-                AppController.reject();
-                Qt.quit();
-            }
+            onAccepted: (result) => window.finishDialog(result, 0)
+            onRejected: window.finishDialog({}, 1)
         }
     }
 
     Component {
         id: accountComp
         AccountDialog {
-            onAccepted: (result) => {
-                AppController.accept(result);
-                Qt.quit();
-            }
-            onRejected: {
-                AppController.reject();
-                Qt.quit();
-            }
+            onAccepted: (result) => window.finishDialog(result, 0)
+            onRejected: window.finishDialog({}, 1)
         }
     }
 
     Component {
         id: dynamicLauncherComp
         DynamicLauncherDialog {
-            onAccepted: (result) => {
-                AppController.accept(result);
-                Qt.quit();
-            }
-            onRejected: {
-                AppController.reject();
-                Qt.quit();
-            }
+            onAccepted: (result) => window.finishDialog(result, 0)
+            onRejected: window.finishDialog({}, 1)
         }
     }
 
     Component {
         id: wallpaperComp
         WallpaperDialog {
-            onAccepted: (result) => {
-                AppController.accept(result);
-                Qt.quit();
-            }
-            onRejected: {
-                AppController.reject();
-                Qt.quit();
-            }
+            onAccepted: (result) => window.finishDialog(result, 0)
+            onRejected: window.finishDialog({}, 1)
         }
     }
 
@@ -186,14 +167,8 @@ Window {
         FileDialog {
             implicitWidth: 1000
             implicitHeight: 600
-            onAccepted: path => {
-                AppController.accept({ "uris": ["file://" + path] });
-                Qt.quit();
-            }
-            onRejected: {
-                AppController.reject();
-                Qt.quit();
-            }
+            onAccepted: path => { console.log("FileDialog onAccepted: path=", path); window.finishDialog({ "uris": ["file://" + path] }, 0) }
+            onRejected: { console.log("FileDialog onRejected"); window.finishDialog({}, 1) }
         }
     }
 }

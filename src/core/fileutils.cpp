@@ -11,7 +11,6 @@
 #include <QGuiApplication>
 #include <QReadWriteLock>
 #include <QStandardPaths>
-#include <QStorageInfo>
 #include <QIcon>
 #include <QRegularExpression>
 
@@ -275,42 +274,72 @@ QString FileUtils::iconForName(const QString& name, const QString& fallback) {
     return QString("image://icon/") + (fallback.isEmpty() ? name : fallback);
 }
 
-QString FileUtils::iconForFile(const QString& name, bool isDir, const QString& mimeType) {
+QString FileUtils::iconForFile(const QString& name, bool isDir, const QString& mimeType, const QString& path) {
     if (isDir) {
-        static const QStringList specialDirs = { "Desktop", "Documents", "Downloads", "Music", "Pictures", "Public", "Templates", "Videos" };
-        if (specialDirs.contains(name)) {
-            QString iconName = QString("folder-%1").arg(name.toLower());
-            if (QIcon::hasThemeIcon(iconName))
-                return QString("image://icon/") + iconName;
+        QString fullPath = path;
+        if (fullPath.isEmpty() && !name.isEmpty()) {
+            fullPath = expandPath(name);
         }
-        return QString("image://icon/inode-directory");
+
+        const QString lower = name.toLower();
+
+        // Check path & name against known special folder types
+        if (lower == QLatin1String("downloads") ||
+            (!fullPath.isEmpty() && fullPath == QStandardPaths::writableLocation(QStandardPaths::DownloadLocation))) {
+            return QStringLiteral("image://icon/folder-download");
+        }
+        if (lower == QLatin1String("documents") ||
+            (!fullPath.isEmpty() && fullPath == QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation))) {
+            return QStringLiteral("image://icon/folder-documents");
+        }
+        if (lower == QLatin1String("pictures") ||
+            (!fullPath.isEmpty() && fullPath == QStandardPaths::writableLocation(QStandardPaths::PicturesLocation))) {
+            return QStringLiteral("image://icon/folder-pictures");
+        }
+        if (lower == QLatin1String("music") ||
+            (!fullPath.isEmpty() && fullPath == QStandardPaths::writableLocation(QStandardPaths::MusicLocation))) {
+            return QStringLiteral("image://icon/folder-music");
+        }
+        if (lower == QLatin1String("videos") || lower == QLatin1String("movies") ||
+            (!fullPath.isEmpty() && fullPath == QStandardPaths::writableLocation(QStandardPaths::MoviesLocation))) {
+            return QStringLiteral("image://icon/folder-videos");
+        }
+        if (lower == QLatin1String("desktop") ||
+            (!fullPath.isEmpty() && fullPath == QStandardPaths::writableLocation(QStandardPaths::DesktopLocation))) {
+            return QStringLiteral("image://icon/folder-desktop");
+        }
+        if (lower == QLatin1String("templates") ||
+            (!fullPath.isEmpty() && fullPath == QStandardPaths::writableLocation(QStandardPaths::TemplatesLocation))) {
+            return QStringLiteral("image://icon/folder-templates");
+        }
+        if (lower == QLatin1String("public") ||
+            (!fullPath.isEmpty() && fullPath == QStandardPaths::writableLocation(QStandardPaths::PublicShareLocation))) {
+            return QStringLiteral("image://icon/folder-publicshare");
+        }
+        if (lower == QLatin1String("projects") || lower == QLatin1String("code") || lower == QLatin1String("dev")) {
+            return QStringLiteral("image://icon/folder-development");
+        }
+        if (lower == QLatin1String("games")) {
+            return QStringLiteral("image://icon/folder-games");
+        }
+        if (lower == QLatin1String("applications")) {
+            return QStringLiteral("image://icon/folder-applications");
+        }
+        if (!fullPath.isEmpty() && fullPath == QDir::homePath()) {
+            return QStringLiteral("image://icon/user-home");
+        }
+
+        return QStringLiteral("image://icon/inode-directory");
     }
 
     if (name.endsWith(".bak", Qt::CaseInsensitive) || name.endsWith("~") ||
         name.endsWith(".backup", Qt::CaseInsensitive) || name.endsWith(".old", Qt::CaseInsensitive)) {
-        if (QIcon::hasThemeIcon("application-x-backup")) {
-            return QString("image://icon/application-x-backup");
-        }
-        if (QIcon::hasThemeIcon("document-revert")) {
-            return QString("image://icon/document-revert");
-        }
-        if (QIcon::hasThemeIcon("edit-undo")) {
-            return QString("image://icon/edit-undo");
-        }
-        if (QIcon::hasThemeIcon("text-x-generic")) {
-            return QString("image://icon/text-x-generic");
-        }
+        return QStringLiteral("image://icon/application-x-backup");
     }
 
     QString mimeIcon = mimeType;
     mimeIcon.replace('/', '-');
-    if (QIcon::hasThemeIcon(mimeIcon)) {
-        return QString("image://icon/") + mimeIcon;
-    }
-    if (QIcon::hasThemeIcon(mimeType)) {
-        return QString("image://icon/") + mimeType;
-    }
-    return QString("image://icon/application-x-zerosize");
+    return QStringLiteral("image://icon/") + mimeIcon;
 }
 
 QString FileUtils::mimeTypeForFile(const QString& path) {
@@ -325,7 +354,6 @@ QString FileUtils::expandPath(const QString& input, const QString& currentDir) {
 
     QString home = QDir::homePath();
 
-    // Expand tilde representations
     if (p == QLatin1String("~") || p == QLatin1String("~/")) {
         p = home;
     } else if (p.startsWith(QLatin1String("~/"))) {
@@ -335,17 +363,14 @@ QString FileUtils::expandPath(const QString& input, const QString& currentDir) {
         QString firstPart = (slashIdx == -1) ? p.mid(1) : p.mid(1, slashIdx - 1);
         QString rest = (slashIdx == -1) ? QString() : p.mid(slashIdx);
 
-        // Check if other user home exists
         QString otherUserHome = "/home/" + firstPart;
         if (QDir(otherUserHome).exists() && !firstPart.isEmpty()) {
             p = otherUserHome + rest;
         } else {
-            // Otherwise treat folder as in the user home directory
             p = home + "/" + firstPart + rest;
         }
     }
 
-    // Expand environment variables
     static const QRegularExpression envRegex(QStringLiteral(R"(\$(?:([A-Za-z_][A-Za-z0-9_]*)|(?:\{([A-Za-z_][A-Za-z0-9_]*)\})))"));
     auto match = envRegex.match(p);
     while (match.hasMatch()) {
@@ -358,7 +383,6 @@ QString FileUtils::expandPath(const QString& input, const QString& currentDir) {
         match = envRegex.match(p);
     }
 
-    // Handle relative path with currentDir
     if (!p.startsWith('/') && !currentDir.isEmpty()) {
         p = currentDir + "/" + p;
     }
@@ -468,7 +492,6 @@ QString FileUtils::getCompletedPath(const QString& input, const QString& current
         return suggestions.first().toMap()["displayPath"].toString();
     }
 
-    // Find longest common prefix among suggestions
     QString first = suggestions.first().toMap()["displayPath"].toString();
     int commonLen = first.length();
 
@@ -488,7 +511,6 @@ QString FileUtils::getCompletedPath(const QString& input, const QString& current
     return suggestions.first().toMap()["displayPath"].toString();
 }
 
-// QML DropEvent does not expose keyboard modifiers, query them from the window system instead
 int FileUtils::queryKeyboardModifiers() {
     return static_cast<int>(QGuiApplication::queryKeyboardModifiers());
 }

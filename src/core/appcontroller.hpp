@@ -24,6 +24,9 @@ class AppController : public QObject {
     Q_PROPERTY(QString appId READ appId WRITE setAppId NOTIFY appIdChanged)
     Q_PROPERTY(QString parentWindow READ parentWindow WRITE setParentWindow NOTIFY parentWindowChanged)
 
+    // FileChooser / Portal D-Bus bridge
+    Q_PROPERTY(QString portalHandle READ portalHandle WRITE setPortalHandle NOTIFY portalHandleChanged)
+
     // FileChooser Specific
     Q_PROPERTY(QString initialDirectory READ initialDirectory WRITE setInitialDirectory NOTIFY initialDirectoryChanged)
     Q_PROPERTY(QString filterLabel READ filterLabel WRITE setFilterLabel NOTIFY filterLabelChanged)
@@ -161,6 +164,9 @@ public:
     void setWallpaperSetOn(const QString& on);
 
     // FileChooser properties
+    QString portalHandle() const { return m_portalHandle; }
+    void setPortalHandle(const QString& handle);
+
     QString initialDirectory() const { return m_initialDirectory; }
     void setInitialDirectory(const QString& dir);
 
@@ -199,6 +205,7 @@ public:
     Q_INVOKABLE void accept(const QVariantMap& results = {});
     Q_INVOKABLE void reject();
     Q_INVOKABLE void quit();
+    Q_INVOKABLE void finishPortalRequest(const QString& handlePath, quint32 response, const QVariantMap& results);
 
     Q_INVOKABLE QVariantList pickColorAt(int x, int y);
     Q_INVOKABLE QString saveScreenshotRegion(int x, int y, int width, int height);
@@ -243,6 +250,9 @@ signals:
     void caseSensitiveSortChanged();
     void showDirsFirstChanged();
 
+    void portalHandleChanged();
+    void portalRequestFinished(const QString& handlePath, quint32 response, const QVariantMap& results);
+
     void accepted(const QVariantMap& results);
     void rejected();
 
@@ -282,6 +292,7 @@ private:
     QImage m_screenCapture;
 
     // FileChooser properties
+    QString m_portalHandle;
     QString m_initialDirectory;
     QString m_filterLabel = QStringLiteral("All files");
     QStringList m_filters = { QStringLiteral("*") };

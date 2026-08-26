@@ -6,8 +6,8 @@
 #include <QDBusObjectPath>
 #include <QMap>
 #include <QObject>
-#include <QProcess>
 #include <QString>
+#include <QStringList>
 #include <QVariantMap>
 #include "request.hpp"
 
@@ -20,8 +20,6 @@ class FileChooserPortal : public QDBusAbstractAdaptor {
 public:
     explicit FileChooserPortal(QObject* parent = nullptr);
     ~FileChooserPortal() override = default;
-
-    static QString findWormholeBinary();
 
 public slots:
     Q_SCRIPTABLE void OpenFile(const QDBusObjectPath& handle,
@@ -45,30 +43,40 @@ public slots:
                                 const QVariantMap& options,
                                 const QDBusMessage& message);
 
-private:
-    struct PendingRequest {
-        QDBusMessage message;
-        QProcess* process = nullptr;
-        PortalRequest* requestObject = nullptr;
-        bool isSaveFiles = false;
-        QStringList fileListToSave;
-    };
+    void finishRequest(const QString& handlePath, quint32 response, const QVariantMap& results);
 
-    void launchPicker(const QString& title,
-                           const QString& initialDir,
-                           bool directoryOnly,
+signals:
+    void openFileRequested(const QString& handlePath,
+                           const QString& title,
                            const QStringList& filters,
                            const QString& filterLabel,
-                           const QDBusObjectPath& handle,
-                           const QDBusMessage& message,
-                           bool isSaveFiles = false,
-                           const QStringList& fileList = {},
-                           bool saveMode = false,
-                           const QString& suggestedName = {},
-                           bool multiple = false);
+                           bool directoryOnly,
+                           bool multiple,
+                           const QString& initialDirectory);
+
+    void saveFileRequested(const QString& handlePath,
+                           const QString& title,
+                           const QStringList& filters,
+                           const QString& filterLabel,
+                           const QString& suggestedName,
+                           const QString& initialDirectory);
+
+    void saveFilesRequested(const QString& handlePath,
+                            const QString& title,
+                            const QStringList& fileList,
+                            const QString& initialDirectory);
+
+private:
+    void sendResponse(const QString& handlePath, quint32 response, const QVariantMap& results);
+    void cleanupRequest(const QString& handlePath);
 
     static QString parseInitialDirectory(const QVariantMap& options);
     static void parseFilters(const QVariantMap& options, QStringList& outFilters, QString& outLabel);
+
+    struct PendingRequest {
+        QDBusMessage message;
+        PortalRequest* requestObject = nullptr;
+    };
 
     QMap<QString, PendingRequest> m_requests;
 };

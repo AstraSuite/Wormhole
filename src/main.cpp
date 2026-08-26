@@ -3,11 +3,13 @@
 #include <QFileInfo>
 #include <QFontDatabase>
 #include <QGuiApplication>
+#include <QIcon>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QProcess>
+#include <QSettings>
 #include <QSurfaceFormat>
 #include <QUrl>
 #include <iostream>
@@ -25,6 +27,76 @@
 #include "portal/filechooserportal.hpp"
 #include "screencast/pipewirestream.hpp"
 #include "screencast/sourcesmodel.hpp"
+
+namespace {
+void setupIconTheme() {
+    // 1. Ensure all standard Freedesktop icon search directories are registered
+    QStringList searchPaths = QIcon::themeSearchPaths();
+    const QString home = QDir::homePath();
+    const QStringList extraPaths = {
+        home + QStringLiteral("/.local/share/icons"),
+        home + QStringLiteral("/.icons"),
+        QStringLiteral("/usr/local/share/icons"),
+        QStringLiteral("/usr/share/icons")
+    };
+    for (const QString& p : extraPaths) {
+        if (QDir(p).exists() && !searchPaths.contains(p)) {
+            searchPaths.prepend(p);
+        }
+    }
+    QIcon::setThemeSearchPaths(searchPaths);
+
+    // 2. Detect configured GTK/system icon theme if Qt did not auto-discover one
+    QString detectedTheme;
+    const QString gtk3Config = home + QStringLiteral("/.config/gtk-3.0/settings.ini");
+    if (QFile::exists(gtk3Config)) {
+        QSettings gtkSettings(gtk3Config, QSettings::IniFormat);
+        detectedTheme = gtkSettings.value(QStringLiteral("Settings/gtk-icon-theme-name")).toString();
+    }
+
+    if (detectedTheme.isEmpty()) {
+        const QString xsettingsConfig = home + QStringLiteral("/.config/xsettingsd/xsettingsd.conf");
+        if (QFile::exists(xsettingsConfig)) {
+            QFile file(xsettingsConfig);
+            if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+                while (!file.atEnd()) {
+                    QString line = QString::fromUtf8(file.readLine()).trimmed();
+                    if (line.startsWith(QLatin1String("Net/IconThemeName"))) {
+                        int startQuote = line.indexOf('"');
+                        int endQuote = line.lastIndexOf('"');
+                        if (startQuote != -1 && endQuote > startQuote) {
+                            detectedTheme = line.mid(startQuote + 1, endQuote - startQuote - 1);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 3. Apply detected theme or search for top installed system themes
+    if (!detectedTheme.isEmpty()) {
+        QIcon::setThemeName(detectedTheme);
+    } else if (QIcon::themeName().isEmpty() || QIcon::themeName() == QLatin1String("hicolor")) {
+        const QStringList candidateThemes = {
+            QStringLiteral("Papirus-Dark"),
+            QStringLiteral("Papirus"),
+            QStringLiteral("breeze-dark"),
+            QStringLiteral("breeze"),
+            QStringLiteral("Adwaita"),
+            QStringLiteral("elementary")
+        };
+        for (const QString& candidate : candidateThemes) {
+            if (QIcon::hasThemeIcon(QStringLiteral("folder-download")) ||
+                QFile::exists(QStringLiteral("/usr/share/icons/") + candidate) ||
+                QFile::exists(home + QStringLiteral("/.local/share/icons/") + candidate)) {
+                QIcon::setThemeName(candidate);
+                break;
+            }
+        }
+    }
+}
+} // namespace
 
 int main(int argc, char* argv[]) {
     qputenv("QT_NO_XDG_DESKTOP_PORTAL", "1");
@@ -44,6 +116,31 @@ int main(int argc, char* argv[]) {
         app.setApplicationDisplayName("Wormhole Portal Daemon");
         app.setOrganizationName("astra-wormhole");
         app.setApplicationVersion("1.0.0");
+
+        setupIconTheme();
+
+        QFontDatabase::addApplicationFont(":/qt/qml/wormhole/assets/fonts/GoogleSansFlex.ttf");
+        QFontDatabase::addApplicationFont(":/qt/qml/wormhole/assets/fonts/MaterialSymbolsRounded.ttf");
+
+        auto* controller = wormhole::core::AppController::instance();
+        auto* colours = new wormhole::config::ColoursSingleton(&app);
+        auto* tokens = wormhole::config::TokensSingleton::instance();
+
+        QQmlApplicationEngine engine;
+        engine.addImageProvider(QStringLiteral("icon"), new wormhole::core::IconImageProvider());
+        engine.addImageProvider(QStringLiteral("monitor"), new wormhole::screencast::ScreenPreviewProvider());
+        engine.addImageProvider(QStringLiteral("thumb"), new wormhole::core::ThumbnailImageProvider());
+
+        auto* fileUtils = new wormhole::core::FileUtils(&app);
+        auto* driveManager = new wormhole::core::DriveManager(&app);
+
+        engine.rootContext()->setContextProperty(QStringLiteral("Colours"), colours);
+        engine.rootContext()->setContextProperty(QStringLiteral("Tokens"), tokens);
+        engine.rootContext()->setContextProperty(QStringLiteral("AppController"), controller);
+        engine.rootContext()->setContextProperty(QStringLiteral("FileUtils"), fileUtils);
+        engine.rootContext()->setContextProperty(QStringLiteral("DriveManager"), driveManager);
+
+        engine.load(QUrl(QStringLiteral("qrc:/qt/qml/wormhole/qml/main.qml")));
 
         wormhole::screencast::PipeWireStreamManager::instance()->initialize();
 
@@ -70,6 +167,8 @@ int main(int argc, char* argv[]) {
     app.setApplicationDisplayName("Wormhole");
     app.setOrganizationName("astra-wormhole");
     app.setApplicationVersion("1.0.0");
+
+    setupIconTheme();
 
     // Load fonts
     QFontDatabase::addApplicationFont(":/qt/qml/wormhole/assets/fonts/GoogleSansFlex.ttf");
