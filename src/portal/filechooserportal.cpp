@@ -283,7 +283,7 @@ void FileChooserPortal::launchAtlasPicker(const QString& title,
     });
 
     connect(process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
-            this, [this, handle](int exitCode, QProcess::ExitStatus /*status*/) {
+            this, [this, handle](int exitCode, QProcess::ExitStatus exitStatus) {
         if (!m_requests.contains(handle.path())) {
             return;
         }
@@ -296,6 +296,14 @@ void FileChooserPortal::launchAtlasPicker(const QString& title,
         QDBusMessage reply = req.message.createReply();
         QVariantMap results;
 
+        if (exitStatus == QProcess::CrashExit) {
+            qWarning() << "wormhole: the file picker crashed with signal" << exitCode
+                       << "- reporting an error rather than a cancellation";
+            reply << static_cast<uint>(2) << results;
+            QDBusConnection::sessionBus().send(reply);
+            return;
+        }
+
         if (exitCode == 0 && !stdoutData.isEmpty()) {
             QString output = QString::fromUtf8(stdoutData).trimmed();
             QStringList lines = output.split(QLatin1Char('\n'), Qt::SkipEmptyParts);
@@ -306,7 +314,7 @@ void FileChooserPortal::launchAtlasPicker(const QString& title,
                 if (trimmed.startsWith(QLatin1String("file://"))) {
                     uris << trimmed;
                 } else if (!trimmed.isEmpty() && QDir::isAbsolutePath(trimmed)) {
-                    uris << QUrl::fromLocalFile(trimmed).toString();
+                    uris << QUrl::fromLocalFile(trimmed).toString(QUrl::FullyEncoded);
                 }
             }
 
