@@ -61,6 +61,8 @@ find_package(Qt6 6.5 REQUIRED COMPONENTS
 )
 
 find_package(PkgConfig REQUIRED)
+pkg_check_modules(Gio IMPORTED_TARGET gio-2.0 REQUIRED)
+pkg_check_modules(Glib IMPORTED_TARGET glib-2.0 REQUIRED)
 pkg_check_modules(PipeWire IMPORTED_TARGET libpipewire-0.3 REQUIRED)
 pkg_check_modules(WaylandClient IMPORTED_TARGET wayland-client REQUIRED)
 pkg_check_modules(WaylandProtocols REQUIRED wayland-protocols>=1.38)
@@ -319,6 +321,8 @@ target_link_libraries(wormhole_app PRIVATE
     Qt6::DBus
     Qt6::Network
     Qt6::Multimedia
+    PkgConfig::Gio
+    PkgConfig::Glib
     PkgConfig::PipeWire
     PkgConfig::WaylandClient
 )

@@ -10,6 +10,12 @@
 #include <QVariantMap>
 #include "../config/colours.hpp"
 
+#pragma push_macro("signals")
+#undef signals
+#include <glib.h>
+#include <gio/gio.h>
+#pragma pop_macro("signals")
+
 namespace wormhole::portal {
 
 class SettingsPortal : public QDBusAbstractAdaptor {
@@ -19,7 +25,7 @@ class SettingsPortal : public QDBusAbstractAdaptor {
 
 public:
     explicit SettingsPortal(QObject* parent = nullptr);
-    ~SettingsPortal() override = default;
+    ~SettingsPortal() override;
 
     uint version() const { return 1; }
 
@@ -36,6 +42,9 @@ signals:
 
 private:
     QVariant readKey(const QString& namesp, const QString& key);
+    static void onGSettingsChanged(GSettings* settings, const gchar* key, gpointer user_data);
+
+    GSettings* m_gsettings = nullptr;
 };
 
 } // namespace wormhole::portal

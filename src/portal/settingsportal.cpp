@@ -7,19 +7,61 @@
 #include <QFile>
 #include <QSettings>
 
+#pragma push_macro("signals")
+#undef signals
+#include <glib.h>
+#include <gio/gio.h>
+#pragma pop_macro("signals")
+
 namespace wormhole::portal {
 
 SettingsPortal::SettingsPortal(QObject* parent)
     : QDBusAbstractAdaptor(parent) {
+    m_gsettings = g_settings_new("org.gnome.desktop.interface");
+    if (m_gsettings) {
+        g_signal_connect(m_gsettings, "changed::color-scheme",
+                         G_CALLBACK(onGSettingsChanged), this);
+    }
+}
+
+SettingsPortal::~SettingsPortal() {
+    if (m_gsettings) {
+        g_signal_handlers_disconnect_by_data(m_gsettings, this);
+        g_object_unref(m_gsettings);
+    }
+}
+
+void SettingsPortal::onGSettingsChanged(GSettings* /*settings*/, const gchar* /*key*/, gpointer user_data) {
+    auto* self = static_cast<SettingsPortal*>(user_data);
+    const QString ns = QStringLiteral("org.freedesktop.appearance");
+
+    QVariantMap values;
+    values.insert(QStringLiteral("color-scheme"), self->readKey(ns, QStringLiteral("color-scheme")));
+    values.insert(QStringLiteral("accent-color"), self->readKey(ns, QStringLiteral("accent-color")));
+    values.insert(QStringLiteral("contrast"), self->readKey(ns, QStringLiteral("contrast")));
+
+    for (auto it = values.constBegin(); it != values.constEnd(); ++it) {
+        emit self->SettingChanged(ns, it.key(), QDBusVariant(it.value()));
+    }
 }
 
 QVariant SettingsPortal::readKey(const QString& namesp, const QString& key) {
     if (namesp == QLatin1String("org.freedesktop.appearance")) {
         if (key == QLatin1String("color-scheme")) {
             // 0 = no preference, 1 = prefer dark, 2 = prefer light
-            QString scheme = qEnvironmentVariable("DARK_MODE");
-            if (scheme == QLatin1String("0") || scheme == QLatin1String("false") || scheme == QLatin1String("light")) {
-                return QVariant::fromValue(static_cast<uint>(2));
+            if (m_gsettings) {
+                gchar* scheme = g_settings_get_string(m_gsettings, "color-scheme");
+                QString value = QString::fromUtf8(scheme);
+                g_free(scheme);
+
+                if (value == QLatin1String("prefer-light")) {
+                    return QVariant::fromValue(static_cast<uint>(2));
+                }
+                if (value == QLatin1String("prefer-dark")) {
+                    return QVariant::fromValue(static_cast<uint>(1));
+                }
+                // "default" or unknown — fall back to dark
+                return QVariant::fromValue(static_cast<uint>(1));
             }
             return QVariant::fromValue(static_cast<uint>(1));
         }
