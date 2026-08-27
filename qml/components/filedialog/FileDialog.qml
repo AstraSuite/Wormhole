@@ -19,6 +19,7 @@ StyledRect {
     readonly property string savePath: currentPath === "/" ? "/" + saveName : currentPath + "/" + saveName
     readonly property bool saveWouldOverwrite: saveMode && saveName.length > 0 && AppController.fileExists(savePath)
     property real zoomLevel: 80
+    property int viewMode: AppController.viewMode
 
     signal accepted(string path)
     signal rejected()
@@ -143,6 +144,27 @@ StyledRect {
         enabled: root.visible
         context: Qt.ApplicationShortcut
         onActivated: root.zoomLevel = 80
+    }
+
+    Shortcut {
+        sequence: "Ctrl+1"
+        enabled: root.visible
+        context: Qt.ApplicationShortcut
+        onActivated: AppController.viewMode = 0
+    }
+
+    Shortcut {
+        sequence: "Ctrl+2"
+        enabled: root.visible
+        context: Qt.ApplicationShortcut
+        onActivated: AppController.viewMode = 1
+    }
+
+    Connections {
+        target: AppController
+        function onViewModeChanged() {
+            root.viewMode = AppController.viewMode;
+        }
     }
 
     implicitWidth: 1000

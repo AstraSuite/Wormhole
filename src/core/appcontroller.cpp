@@ -4,6 +4,7 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QProcess>
+#include <QSettings>
 #include <QStandardPaths>
 #include <QUrl>
 #include "screencast/waylandcapture.hpp"
@@ -17,6 +18,8 @@ AppController* AppController::instance() {
 
 AppController::AppController(QObject* parent)
     : QObject(parent) {
+    QSettings settings("astra-wormhole", "wormhole");
+    m_viewMode = settings.value("session/viewMode", 0).toInt();
 }
 
 void AppController::setDialogMode(DialogMode mode) {
@@ -261,6 +264,15 @@ void AppController::setShowDirsFirst(bool dirsFirst) {
     if (m_showDirsFirst != dirsFirst) {
         m_showDirsFirst = dirsFirst;
         emit showDirsFirstChanged();
+    }
+}
+
+void AppController::setViewMode(int mode) {
+    if (m_viewMode != mode) {
+        m_viewMode = mode;
+        emit viewModeChanged();
+        QSettings settings("astra-wormhole", "wormhole");
+        settings.setValue("session/viewMode", m_viewMode);
     }
 }
 

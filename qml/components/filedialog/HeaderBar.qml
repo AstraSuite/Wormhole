@@ -155,6 +155,33 @@ StyledRect {
             }
         }
 
+        // View mode toggle
+        Item {
+            implicitWidth: implicitHeight
+            implicitHeight: viewModeIcon.implicitHeight + Tokens.padding.small
+
+            StateLayer {
+                id: viewModeHover
+                radius: Tokens.rounding.medium
+                onClicked: {
+                    AppController.viewMode = AppController.viewMode === 0 ? 1 : 0;
+                }
+            }
+
+            MaterialIcon {
+                id: viewModeIcon
+
+                anchors.centerIn: parent
+                text: root.dialog.viewMode === 0 ? "view_list" : "grid_view"
+                color: Colours.palette.m3onSurface
+            }
+
+            StyledToolTip {
+                text: root.dialog.viewMode === 0 ? qsTr("List view (Ctrl+2)") : qsTr("Grid view (Ctrl+1)")
+                visible: viewModeHover.containsMouse
+            }
+        }
+
         // Hidden files toggle
         Item {
             implicitWidth: implicitHeight

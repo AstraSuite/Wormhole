@@ -39,6 +39,7 @@ class AppController : public QObject {
     Q_PROPERTY(bool singleClick READ singleClick WRITE setSingleClick NOTIFY singleClickChanged)
     Q_PROPERTY(bool caseSensitiveSort READ caseSensitiveSort WRITE setCaseSensitiveSort NOTIFY caseSensitiveSortChanged)
     Q_PROPERTY(bool showDirsFirst READ showDirsFirst WRITE setShowDirsFirst NOTIFY showDirsFirstChanged)
+    Q_PROPERTY(int viewMode READ viewMode WRITE setViewMode NOTIFY viewModeChanged)
 
     // ScreenCast Specific
     Q_PROPERTY(uint availableSourceTypes READ availableSourceTypes WRITE setAvailableSourceTypes NOTIFY availableSourceTypesChanged)
@@ -200,6 +201,9 @@ public:
     bool showDirsFirst() const { return m_showDirsFirst; }
     void setShowDirsFirst(bool dirsFirst);
 
+    int viewMode() const { return m_viewMode; }
+    void setViewMode(int mode);
+
     Q_INVOKABLE static bool fileExists(const QString& path);
 
     Q_INVOKABLE void accept(const QVariantMap& results = {});
@@ -249,6 +253,7 @@ signals:
     void singleClickChanged();
     void caseSensitiveSortChanged();
     void showDirsFirstChanged();
+    void viewModeChanged();
 
     void portalHandleChanged();
     void portalRequestFinished(const QString& handlePath, quint32 response, const QVariantMap& results);
@@ -304,6 +309,7 @@ private:
     bool m_singleClick = false;
     bool m_caseSensitiveSort = false;
     bool m_showDirsFirst = true;
+    int m_viewMode = 0;
 };
 
 } // namespace wormhole::core
