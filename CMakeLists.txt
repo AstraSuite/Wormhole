@@ -1,5 +1,46 @@
 cmake_minimum_required(VERSION 3.19)
-project(wormhole VERSION 1.0.0 LANGUAGES C CXX)
+
+# Version selection: pass -DWORMHOLE_VERSION=X.Y.Z to pin the version manually,
+# otherwise derive it from the most recent git tag (e.g. v1.2.3).
+set(WORMHOLE_VERSION ""
+    CACHE STRING "Version of wormhole (default: latest git tag)")
+
+if(NOT WORMHOLE_VERSION)
+    find_package(Git QUIET)
+    if(GIT_EXECUTABLE)
+        execute_process(
+            COMMAND "${GIT_EXECUTABLE}" describe --tags --match "v[0-9]*" --abbrev=0 HEAD
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            RESULT_VARIABLE git_describe_result
+            OUTPUT_VARIABLE git_describe_version
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            ERROR_QUIET
+        )
+        if(git_describe_result EQUAL 0 AND git_describe_version)
+            string(REGEX REPLACE "^v" "" WORMHOLE_VERSION "${git_describe_version}")
+        endif()
+    endif()
+endif()
+
+if(NOT WORMHOLE_VERSION)
+    # Dev version: YYYY.MM.DD.git.HASH
+    find_package(Git REQUIRED)
+    execute_process(
+        COMMAND "${GIT_EXECUTABLE}" log -1 --format=%cd --date=format:%Y.%m.%d
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        OUTPUT_VARIABLE git_date
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    execute_process(
+        COMMAND "${GIT_EXECUTABLE}" rev-parse --short HEAD
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        OUTPUT_VARIABLE git_hash
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    set(WORMHOLE_VERSION "${git_date}.git.${git_hash}")
+endif()
+
+project(wormhole VERSION ${WORMHOLE_VERSION} LANGUAGES C CXX)
 
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
     set(CMAKE_INSTALL_PREFIX "/usr" CACHE PATH "Default install prefix" FORCE)
