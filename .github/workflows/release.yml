@@ -57,7 +57,7 @@ jobs:
           tag="${GITHUB_REF_NAME}"
           version="${tag#v}"
 
-          cp -v build/wormhole_app "astra-wormhole-${tag}"
+          cp -v build/bin/wormhole "astra-wormhole-${tag}"
           git archive --format=tar.gz --prefix="astra-wormhole-${version}/" -o "astra-wormhole-${version}.tar.gz" "${tag}"
 
           echo "ARTIFACTS<<EOF" >> "$GITHUB_ENV"
