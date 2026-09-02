@@ -31,6 +31,16 @@ SettingsPortal::~SettingsPortal() {
     }
 }
 
+void SettingsPortal::emitInitialSignals() {
+    const QString ns = QStringLiteral("org.freedesktop.appearance");
+    emit SettingChanged(ns, QStringLiteral("color-scheme"),
+                        QDBusVariant(readKey(ns, QStringLiteral("color-scheme"))));
+    emit SettingChanged(ns, QStringLiteral("accent-color"),
+                        QDBusVariant(readKey(ns, QStringLiteral("accent-color"))));
+    emit SettingChanged(ns, QStringLiteral("contrast"),
+                        QDBusVariant(readKey(ns, QStringLiteral("contrast"))));
+}
+
 void SettingsPortal::onGSettingsChanged(GSettings* /*settings*/, const gchar* /*key*/, gpointer user_data) {
     auto* self = static_cast<SettingsPortal*>(user_data);
     const QString ns = QStringLiteral("org.freedesktop.appearance");
@@ -93,7 +103,7 @@ void SettingsPortal::Read(const QString& namesp,
     }
 
     QDBusMessage reply = message.createReply();
-    reply << QVariant::fromValue(QDBusVariant(val));
+    reply << val;
     QDBusConnection::sessionBus().send(reply);
 }
 
@@ -112,9 +122,9 @@ void SettingsPortal::ReadAll(const QStringList& namespaces,
     if (handleAppearance) {
         const QString ns = QStringLiteral("org.freedesktop.appearance");
         QVariantMap appMap;
-        appMap.insert(QStringLiteral("color-scheme"), QVariant::fromValue(QDBusVariant(readKey(ns, QStringLiteral("color-scheme")))));
-        appMap.insert(QStringLiteral("accent-color"), QVariant::fromValue(QDBusVariant(readKey(ns, QStringLiteral("accent-color")))));
-        appMap.insert(QStringLiteral("contrast"), QVariant::fromValue(QDBusVariant(readKey(ns, QStringLiteral("contrast")))));
+        appMap.insert(QStringLiteral("color-scheme"), readKey(ns, QStringLiteral("color-scheme")));
+        appMap.insert(QStringLiteral("accent-color"), readKey(ns, QStringLiteral("accent-color")));
+        appMap.insert(QStringLiteral("contrast"), readKey(ns, QStringLiteral("contrast")));
         result.insert(ns, appMap);
     }
 

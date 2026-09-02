@@ -28,6 +28,7 @@ public:
     ~SettingsPortal() override;
 
     uint version() const { return 1; }
+    void emitInitialSignals();
 
 public slots:
     Q_SCRIPTABLE void Read(const QString& namesp,

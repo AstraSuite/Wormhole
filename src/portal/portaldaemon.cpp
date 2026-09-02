@@ -59,6 +59,8 @@ bool PortalDaemon::start() {
         return false;
     }
 
+    m_settings->emitInitialSignals();
+
     auto* ctrl = wormhole::core::AppController::instance();
 
     connect(m_fileChooser, &FileChooserPortal::openFileRequested,
