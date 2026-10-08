@@ -96,6 +96,7 @@ Item {
 
             cellWidth: Math.max(144, root.zoomSize + 48)
             cellHeight: root.zoomSize + 84
+            Component.onCompleted: forceActiveFocus()
 
             clip: true
             focus: true
@@ -265,6 +266,7 @@ Item {
                         acceptedButtons: Qt.LeftButton | Qt.RightButton
 
                         onClicked: mouse => {
+                            gridView.forceActiveFocus();
                             gridView.currentIndex = delegateContainer.index;
                             if (AppController.singleClick && mouse.button === Qt.LeftButton) {
                                 root.handleItemClick(delegateContainer.modelData);
@@ -380,6 +382,8 @@ Item {
             maximumFlickVelocity: 5000
             flickDeceleration: 5000
 
+            Component.onCompleted: forceActiveFocus()
+
             Keys.onEscapePressed: currentIndex = -1
 
             Keys.onReturnPressed: root.triggerAcceptOrOpen()
@@ -448,6 +452,7 @@ Item {
                         acceptedButtons: Qt.LeftButton | Qt.RightButton
 
                         onClicked: mouse => {
+                            listView.forceActiveFocus();
                             listView.currentIndex = listDelegate.index;
                             if (AppController.singleClick && mouse.button === Qt.LeftButton) {
                                 root.handleItemClick(listDelegate.modelData);

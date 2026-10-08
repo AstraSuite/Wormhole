@@ -86,12 +86,9 @@ StyledRect {
         }
     }
 
-    Shortcut {
-        sequence: "Escape"
-        enabled: root.visible
-        context: Qt.ApplicationShortcut
-        onActivated: root.rejected()
-    }
+    // Note: Escape/cancel is handled by the application-wide Shortcut in main.qml.
+    // Do not register another Escape shortcut here, or the two become ambiguous
+    // and neither fires.
 
     Shortcut {
         sequence: "Ctrl+H"
