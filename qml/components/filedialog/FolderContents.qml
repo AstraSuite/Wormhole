@@ -15,6 +15,7 @@ Item {
     FileSystemModel {
         id: fsModel
         path: root.dialog.currentPath
+        searchQuery: root.dialog.activeSearchQuery
         showHidden: root.dialog.showHidden
         caseSensitiveSort: AppController.caseSensitiveSort
         showDirsFirst: AppController.showDirsFirst
@@ -58,13 +59,13 @@ Item {
         sourceComponent: ColumnLayout {
             MaterialIcon {
                 Layout.alignment: Qt.AlignHCenter
-                text: "scan_delete"
+                text: fsModel.isSearching ? "search_off" : "scan_delete"
                 color: Colours.palette.m3outline
                 fontStyle: Tokens.font.icon.builders.extraLarge.scale(2).weight(Font.Medium).build()
             }
 
             StyledText {
-                text: qsTr("This folder is empty")
+                text: fsModel.isSearching ? qsTr("No matching files found") : qsTr("This folder is empty")
                 color: Colours.palette.m3outline
                 font: Tokens.font.body.builders.large.weight(Font.Medium).build()
             }
@@ -727,13 +728,24 @@ Item {
     function handleItemClick(file) {
         if (!file) return;
         if (file.isDir) {
-            let newCwd = root.dialog.cwd.slice();
-            newCwd.push(file.name);
-            root.dialog.cwd = newCwd;
+            root.navigateInto(file);
         } else if (root.dialog.saveMode) {
             root.dialog.saveName = file.name;
         } else if (root.dialog.selectionValid && !root.dialog.directoryOnly) {
             root.dialog.accepted(file.path);
+        }
+    }
+
+    function navigateInto(file) {
+        if (!file || !file.isDir) return;
+        if (fsModel.isSearching) {
+            // Search results can live anywhere; jump straight to the real path.
+            root.dialog.clearSearch();
+            root.dialog.cwd = root.dialog.pathToCwd(file.path);
+        } else {
+            let newCwd = root.dialog.cwd.slice();
+            newCwd.push(file.name);
+            root.dialog.cwd = newCwd;
         }
     }
 
@@ -743,9 +755,7 @@ Item {
                 if (root.dialog.directoryOnly) {
                     root.dialog.accepted(currentItem.modelData.path);
                 } else {
-                    let newCwd = root.dialog.cwd.slice();
-                    newCwd.push(currentItem.modelData.name);
-                    root.dialog.cwd = newCwd;
+                    root.navigateInto(currentItem.modelData);
                 }
                 return;
             }

@@ -71,7 +71,7 @@ Window {
 
     Shortcut {
         sequence: "Escape"
-        enabled: window.visible
+        enabled: window.visible && !(activeLoader.item && activeLoader.item.isTextInputActive === true)
         context: Qt.ApplicationShortcut
         onActivated: {
             finishDialog({}, 1);

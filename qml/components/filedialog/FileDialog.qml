@@ -21,8 +21,20 @@ StyledRect {
     property real zoomLevel: 80
     property int viewMode: AppController.viewMode
 
+    // Address-bar / search state, shared with the header bar and folder contents.
+    property bool isEditingPath: false
+    property bool isSearching: false
+    property string searchText: ""
+    readonly property string activeSearchQuery: isSearching ? searchText : ""
+    readonly property bool isTextInputActive: isEditingPath || isSearching
+
     signal accepted(string path)
     signal rejected()
+
+    function clearSearch() {
+        isSearching = false;
+        searchText = "";
+    }
 
     function pathToCwd(fullPath) {
         if (!fullPath || fullPath === "") return ["Home"];
@@ -115,6 +127,47 @@ StyledRect {
         }
     }
 
+    // While the address bar or search field is active, Escape closes them
+    // instead of rejecting the dialog. The global Escape shortcut in main.qml
+    // is disabled in that state, so only one of the two is ever enabled.
+    Shortcut {
+        sequence: "Escape"
+        enabled: root.visible && root.isTextInputActive
+        context: Qt.ApplicationShortcut
+        onActivated: {
+            if (root.isSearching) {
+                headerBar.closeSearch();
+            } else if (headerBar.showSuggestions) {
+                headerBar.showSuggestions = false;
+            } else {
+                root.isEditingPath = false;
+            }
+        }
+    }
+
+    // Open the file search bar (Atlas parity: Ctrl+F / F9).
+    Shortcut {
+        sequences: ["Ctrl+F", "F9", "Shift+F9"]
+        enabled: root.visible
+        context: Qt.ApplicationShortcut
+        onActivated: headerBar.openSearch()
+    }
+
+    // Focus the editable address bar (Atlas parity: Ctrl+L / Alt+D).
+    Shortcut {
+        sequence: "Ctrl+L"
+        enabled: root.visible
+        context: Qt.ApplicationShortcut
+        onActivated: headerBar.openAddressEdit()
+    }
+
+    Shortcut {
+        sequence: "Alt+D"
+        enabled: root.visible
+        context: Qt.ApplicationShortcut
+        onActivated: headerBar.openAddressEdit()
+    }
+
     Shortcut {
         sequence: "Ctrl+="
         enabled: root.visible
@@ -183,6 +236,8 @@ StyledRect {
             spacing: 0
 
             HeaderBar {
+                id: headerBar
+
                 Layout.fillWidth: true
                 dialog: root
             }
