@@ -71,6 +71,7 @@ StyledRect {
         }
         showSuggestions = false;
         root.dialog.isEditingPath = false;
+        root.dialog.focusView();
     }
 
     function openAddressEdit() {
@@ -606,6 +607,31 @@ StyledRect {
                         root.dialog.searchText = text;
                     }
 
+                    // "/" is the search hotkey, so never let it leak into the query.
+                    Keys.onPressed: event => {
+                        if (event.key === Qt.Key_Slash && event.modifiers === Qt.NoModifier) {
+                            event.accepted = true;
+                        }
+                    }
+
+                    // Enter/arrows hand control back to the results view so the
+                    // user can pick the first match and navigate the list.
+                    Keys.onReturnPressed: event => {
+                        root.dialog.focusSearchResults();
+                        event.accepted = true;
+                    }
+                    Keys.onEnterPressed: event => {
+                        root.dialog.focusSearchResults();
+                        event.accepted = true;
+                    }
+                    Keys.onDownPressed: event => {
+                        root.dialog.searchNavigateDown();
+                        event.accepted = true;
+                    }
+                    Keys.onUpPressed: event => {
+                        root.dialog.searchNavigateUp();
+                        event.accepted = true;
+                    }
                     Keys.onEscapePressed: event => {
                         root.closeSearch();
                         event.accepted = true;

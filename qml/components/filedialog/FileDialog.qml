@@ -34,6 +34,34 @@ StyledRect {
     function clearSearch() {
         isSearching = false;
         searchText = "";
+        focusView();
+    }
+
+    function focusView() {
+        if (folderContents)
+            folderContents.focusView();
+    }
+
+    // Hand control from the search field back to the results view.
+    function focusSearchResults() {
+        if (folderContents) {
+            folderContents.focusView();
+            folderContents.selectIndex(0);
+        }
+    }
+
+    function searchNavigateDown() {
+        if (folderContents)
+            folderContents.focusDown();
+    }
+
+    function searchNavigateUp() {
+        if (folderContents)
+            folderContents.focusUp();
+    }
+
+    function openSearch(initialChar) {
+        headerBar.openSearch(initialChar);
     }
 
     function pathToCwd(fullPath) {
@@ -141,6 +169,7 @@ StyledRect {
                 headerBar.showSuggestions = false;
             } else {
                 root.isEditingPath = false;
+                root.focusView();
             }
         }
     }
@@ -150,7 +179,7 @@ StyledRect {
         sequences: ["Ctrl+F", "F9", "Shift+F9"]
         enabled: root.visible
         context: Qt.ApplicationShortcut
-        onActivated: headerBar.openSearch()
+        onActivated: root.openSearch()
     }
 
     // Focus the editable address bar (Atlas parity: Ctrl+L / Alt+D).

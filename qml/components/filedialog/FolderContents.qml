@@ -12,6 +12,75 @@ Item {
     readonly property var currentItem: viewLoader.item ? viewLoader.item.currentItem : null
     readonly property real zoomSize: root.dialog.zoomLevel
 
+    // Type-ahead: jump to the first entry starting with the typed character(s);
+    // repeating the same character cycles to the next match.
+    property string typeAheadBuffer: ""
+
+    Timer {
+        id: typeAheadTimer
+        interval: 800
+        repeat: false
+        onTriggered: root.typeAheadBuffer = ""
+    }
+
+    function handleTypeAhead(text) {
+        if (!viewLoader.item || fsModel.count === 0)
+            return;
+        let view = viewLoader.item;
+        typeAheadTimer.restart();
+
+        let isSingleCharRepeat = (text.length === 1 && root.typeAheadBuffer.length === 1 && root.typeAheadBuffer.toLowerCase() === text.toLowerCase());
+
+        let startIndex = 0;
+        if (isSingleCharRepeat) {
+            startIndex = (view.currentIndex >= 0 ? view.currentIndex : -1) + 1;
+        } else {
+            root.typeAheadBuffer += text;
+        }
+
+        let matchIdx = fsModel.findFirstIndexByPrefix(root.typeAheadBuffer, startIndex);
+        if (matchIdx !== -1) {
+            view.currentIndex = matchIdx;
+            if (view.positionAtIndex)
+                view.positionAtIndex(matchIdx);
+        }
+    }
+
+    // Keyboard control helpers used by the search/address bars so they can hand
+    // focus (and an initial selection) back to the file view.
+    function focusView() {
+        if (viewLoader.item && viewLoader.item.focusView)
+            viewLoader.item.focusView();
+    }
+
+    function selectIndex(index) {
+        let view = viewLoader.item;
+        if (!view || fsModel.count === 0)
+            return;
+        let clamped = Math.max(0, Math.min(index, fsModel.count - 1));
+        view.currentIndex = clamped;
+        if (view.positionAtIndex)
+            view.positionAtIndex(clamped);
+    }
+
+    function focusDown() {
+        let view = viewLoader.item;
+        if (!view || fsModel.count === 0)
+            return;
+        root.focusView();
+        if (view.currentIndex < 0)
+            root.selectIndex(0);
+    }
+
+    function focusUp() {
+        let view = viewLoader.item;
+        if (!view || fsModel.count === 0)
+            return;
+        root.focusView();
+        if (view.currentIndex < 0)
+            root.selectIndex(fsModel.count - 1);
+    }
+
     FileSystemModel {
         id: fsModel
         path: root.dialog.currentPath
@@ -95,6 +164,14 @@ Item {
 
             property alias currentItem: gridView.currentItem
 
+            function positionAtIndex(index) {
+                gridView.positionViewAtIndex(index, GridView.Contain);
+            }
+
+            function focusView() {
+                gridView.forceActiveFocus();
+            }
+
             cellWidth: Math.max(144, root.zoomSize + 48)
             cellHeight: root.zoomSize + 84
             Component.onCompleted: forceActiveFocus()
@@ -140,37 +217,57 @@ Item {
                     return;
                 }
 
-                if (event.key === Qt.Key_Left || event.key === Qt.Key_H) {
-                    if (gridView.currentIndex <= 0 && fsModel.count > 0) {
-                        gridView.currentIndex = 0;
-                    } else {
-                        gridView.moveCurrentIndexLeft();
+                if (event.modifiers === Qt.NoModifier || event.modifiers === Qt.KeypadModifier) {
+                    if (event.key === Qt.Key_Left) {
+                        if (gridView.currentIndex <= 0 && fsModel.count > 0) {
+                            gridView.currentIndex = 0;
+                        } else {
+                            gridView.moveCurrentIndexLeft();
+                        }
+                        event.accepted = true;
+                        return;
+                    } else if (event.key === Qt.Key_Right) {
+                        if (gridView.currentIndex === -1 && fsModel.count > 0) {
+                            gridView.currentIndex = 0;
+                        } else {
+                            gridView.moveCurrentIndexRight();
+                        }
+                        event.accepted = true;
+                        return;
+                    } else if (event.key === Qt.Key_Up) {
+                        if (gridView.currentIndex === -1 && fsModel.count > 0) {
+                            gridView.currentIndex = 0;
+                        } else {
+                            gridView.moveCurrentIndexUp();
+                        }
+                        event.accepted = true;
+                        return;
+                    } else if (event.key === Qt.Key_Down) {
+                        if (gridView.currentIndex === -1 && fsModel.count > 0) {
+                            gridView.currentIndex = 0;
+                        } else {
+                            gridView.moveCurrentIndexDown();
+                        }
+                        event.accepted = true;
+                        return;
+                    } else if (event.key === Qt.Key_Slash) {
+                        root.dialog.openSearch("");
+                        event.accepted = true;
+                        return;
+                    } else if (event.key === Qt.Key_Backspace) {
+                        if (root.dialog.cwd.length > 1) {
+                            root.dialog.cwd = root.dialog.cwd.slice(0, root.dialog.cwd.length - 1);
+                            event.accepted = true;
+                        }
+                        return;
                     }
-                    event.accepted = true;
-                } else if (event.key === Qt.Key_Right || event.key === Qt.Key_L) {
-                    if (gridView.currentIndex === -1 && fsModel.count > 0) {
-                        gridView.currentIndex = 0;
-                    } else {
-                        gridView.moveCurrentIndexRight();
-                    }
-                    event.accepted = true;
-                } else if (event.key === Qt.Key_Up || event.key === Qt.Key_K) {
-                    if (gridView.currentIndex === -1 && fsModel.count > 0) {
-                        gridView.currentIndex = 0;
-                    } else {
-                        gridView.moveCurrentIndexUp();
-                    }
-                    event.accepted = true;
-                } else if (event.key === Qt.Key_Down || event.key === Qt.Key_J) {
-                    if (gridView.currentIndex === -1 && fsModel.count > 0) {
-                        gridView.currentIndex = 0;
-                    } else {
-                        gridView.moveCurrentIndexDown();
-                    }
-                    event.accepted = true;
-                } else if (event.key === Qt.Key_Backspace) {
-                    if (root.dialog.cwd.length > 1) {
-                        root.dialog.cwd = root.dialog.cwd.slice(0, root.dialog.cwd.length - 1);
+                }
+
+                if ((event.modifiers === Qt.NoModifier || event.modifiers === Qt.ShiftModifier) && event.text.length > 0) {
+                    let ch = event.text;
+                    let code = ch.charCodeAt(0);
+                    if (code >= 32 && ch !== ' ') {
+                        root.handleTypeAhead(ch);
                         event.accepted = true;
                     }
                 }
@@ -374,6 +471,15 @@ Item {
             id: listRoot
 
             property alias currentItem: listView.currentItem
+            property alias currentIndex: listView.currentIndex
+
+            function positionAtIndex(index) {
+                listView.positionViewAtIndex(index, ListView.Contain);
+            }
+
+            function focusView() {
+                listView.forceActiveFocus();
+            }
 
             // Session column widths for the list view. The picker is transient, so
             // these are intentionally not persisted.
@@ -569,23 +675,41 @@ Item {
                 Keys.onEnterPressed: root.triggerAcceptOrOpen()
 
                 Keys.onPressed: event => {
-                    if (event.key === Qt.Key_Up || event.key === Qt.Key_K) {
-                        if (listView.currentIndex <= 0 && fsModel.count > 0) {
-                            listView.currentIndex = 0;
-                        } else {
-                            listView.decrementCurrentIndex();
+                    if (event.modifiers === Qt.NoModifier || event.modifiers === Qt.KeypadModifier) {
+                        if (event.key === Qt.Key_Up) {
+                            if (listView.currentIndex <= 0 && fsModel.count > 0) {
+                                listView.currentIndex = 0;
+                            } else {
+                                listView.decrementCurrentIndex();
+                            }
+                            event.accepted = true;
+                            return;
+                        } else if (event.key === Qt.Key_Down) {
+                            if (listView.currentIndex === -1 && fsModel.count > 0) {
+                                listView.currentIndex = 0;
+                            } else {
+                                listView.incrementCurrentIndex();
+                            }
+                            event.accepted = true;
+                            return;
+                        } else if (event.key === Qt.Key_Slash) {
+                            root.dialog.openSearch("");
+                            event.accepted = true;
+                            return;
+                        } else if (event.key === Qt.Key_Backspace) {
+                            if (root.dialog.cwd.length > 1) {
+                                root.dialog.cwd = root.dialog.cwd.slice(0, root.dialog.cwd.length - 1);
+                                event.accepted = true;
+                            }
+                            return;
                         }
-                        event.accepted = true;
-                    } else if (event.key === Qt.Key_Down || event.key === Qt.Key_J) {
-                        if (listView.currentIndex === -1 && fsModel.count > 0) {
-                            listView.currentIndex = 0;
-                        } else {
-                            listView.incrementCurrentIndex();
-                        }
-                        event.accepted = true;
-                    } else if (event.key === Qt.Key_Backspace) {
-                        if (root.dialog.cwd.length > 1) {
-                            root.dialog.cwd = root.dialog.cwd.slice(0, root.dialog.cwd.length - 1);
+                    }
+
+                    if ((event.modifiers === Qt.NoModifier || event.modifiers === Qt.ShiftModifier) && event.text.length > 0) {
+                        let ch = event.text;
+                        let code = ch.charCodeAt(0);
+                        if (code >= 32 && ch !== ' ') {
+                            root.handleTypeAhead(ch);
                             event.accepted = true;
                         }
                     }

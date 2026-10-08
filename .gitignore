@@ -5,3 +5,6 @@ bin/
 .vscode/
 *.user
 *.log
+ATLAS.md
+AGENTS.md
+fix_in_atlas.md
