@@ -280,6 +280,7 @@ qt_add_qml_module(wormhole_app
         qml/components/effects/Colouriser.qml
         qml/components/effects/Elevation.qml
         qml/components/effects/Mask.qml
+        qml/components/filedialog/ColumnResizeHandle.qml
         qml/components/filedialog/CurrentItem.qml
         qml/components/filedialog/DialogButtons.qml
         qml/components/filedialog/FileDialog.qml

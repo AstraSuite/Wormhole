@@ -369,163 +369,354 @@ Item {
     Component {
         id: listComp
 
-        VerticalFadeListView {
-            id: listView
+        ColumnLayout {
+            id: listRoot
 
             property alias currentItem: listView.currentItem
 
-            clip: true
-            focus: true
-            currentIndex: -1
-            interactive: true
-            boundsBehavior: Flickable.DragAndOvershootBounds
-            maximumFlickVelocity: 5000
-            flickDeceleration: 5000
+            // Session column widths for the list view. The picker is transient, so
+            // these are intentionally not persisted.
+            property var columnWidths: ({ "size": 90, "type": 160, "date": 140 })
 
-            Component.onCompleted: forceActiveFocus()
+            readonly property int count: fsModel.count
 
-            Keys.onEscapePressed: currentIndex = -1
+            readonly property var columnSpecs: [
+                {
+                    key: "size",
+                    label: qsTr("Size"),
+                    width: 90,
+                    sort: FileSystemModel.SortBySize,
+                    descendingFirst: false,
+                    alignRight: true
+                },
+                {
+                    key: "type",
+                    label: qsTr("Type"),
+                    width: 160,
+                    sort: FileSystemModel.SortByType,
+                    descendingFirst: false,
+                    alignRight: false
+                },
+                {
+                    key: "date",
+                    label: qsTr("Date Modified"),
+                    width: 140,
+                    sort: FileSystemModel.SortByDate,
+                    descendingFirst: true,
+                    alignRight: true
+                }
+            ]
 
-            Keys.onReturnPressed: root.triggerAcceptOrOpen()
-            Keys.onEnterPressed: root.triggerAcceptOrOpen()
+            function colWidth(key) {
+                return columnWidths[key] !== undefined ? columnWidths[key] : 100;
+            }
 
-            Keys.onPressed: event => {
-                if (event.key === Qt.Key_Up || event.key === Qt.Key_K) {
-                    if (listView.currentIndex <= 0 && fsModel.count > 0) {
-                        listView.currentIndex = 0;
-                    } else {
-                        listView.decrementCurrentIndex();
+            function setColWidth(key, value) {
+                const copy = Object.assign({}, columnWidths);
+                copy[key] = Math.max(60, Math.round(value));
+                columnWidths = copy;
+            }
+
+            function cellText(file, key) {
+                if (!file)
+                    return "";
+                switch (key) {
+                case "size":
+                    return file.isDir ? "" : (file.formattedSize || "");
+                case "type":
+                    return file.mimeDescription || "";
+                case "date":
+                    return file.formattedDate || "";
+                }
+                return "";
+            }
+
+            function toggleSort(field, descendingFirst) {
+                if (fsModel.sortField === field) {
+                    fsModel.sortOrder = fsModel.sortOrder === Qt.AscendingOrder ? Qt.DescendingOrder : Qt.AscendingOrder;
+                } else {
+                    fsModel.sortField = field;
+                    fsModel.sortOrder = descendingFirst ? Qt.DescendingOrder : Qt.AscendingOrder;
+                }
+            }
+
+            spacing: Tokens.spacing.extraSmall
+
+            // Column header row
+            StyledRect {
+                Layout.fillWidth: true
+                implicitHeight: 36
+                radius: Tokens.rounding.small
+                color: Colours.tPalette.m3surfaceContainerHigh
+
+                RowLayout {
+                    id: headerRow
+
+                    anchors.fill: parent
+                    anchors.leftMargin: Tokens.padding.medium
+                    anchors.rightMargin: Tokens.padding.medium
+                    spacing: Tokens.spacing.small
+
+                    // Name column
+                    Item {
+                        Layout.fillWidth: true
+                        Layout.minimumWidth: 120
+                        implicitHeight: parent.height
+                        clip: true
+
+                        RowLayout {
+                            anchors.verticalCenter: parent.verticalCenter
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            spacing: Tokens.spacing.extraSmall
+
+                            StyledText {
+                                Layout.fillWidth: true
+                                text: qsTr("Name")
+                                font: Tokens.font.label.medium
+                                color: Colours.palette.m3onSurface
+                                elide: Text.ElideRight
+                            }
+
+                            MaterialIcon {
+                                visible: fsModel.sortField === FileSystemModel.SortByName
+                                text: fsModel.sortOrder === Qt.AscendingOrder ? "arrow_upward" : "arrow_downward"
+                                fontStyle: Tokens.font.icon.small
+                                color: Colours.palette.m3primary
+                            }
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: listRoot.toggleSort(FileSystemModel.SortByName, false)
+                        }
                     }
-                    event.accepted = true;
-                } else if (event.key === Qt.Key_Down || event.key === Qt.Key_J) {
-                    if (listView.currentIndex === -1 && fsModel.count > 0) {
-                        listView.currentIndex = 0;
-                    } else {
-                        listView.incrementCurrentIndex();
-                    }
-                    event.accepted = true;
-                } else if (event.key === Qt.Key_Backspace) {
-                    if (root.dialog.cwd.length > 1) {
-                        root.dialog.cwd = root.dialog.cwd.slice(0, root.dialog.cwd.length - 1);
-                        event.accepted = true;
+
+                    Repeater {
+                        id: headerRepeater
+
+                        model: listRoot.columnSpecs
+
+                        delegate: Item {
+                            id: headerCell
+
+                            required property var modelData
+
+                            Layout.preferredWidth: listRoot.colWidth(modelData.key)
+                            implicitHeight: parent.height
+
+                            ColumnResizeHandle {
+                                columnKey: headerCell.modelData.key
+                                defaultWidth: headerCell.modelData.width
+                                columnWidth: listRoot.colWidth(headerCell.modelData.key)
+                                onResized: width => listRoot.setColWidth(headerCell.modelData.key, width)
+                            }
+
+                            RowLayout {
+                                anchors.verticalCenter: parent.verticalCenter
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                spacing: Tokens.spacing.extraSmall
+
+                                StyledText {
+                                    Layout.fillWidth: true
+                                    text: headerCell.modelData.label
+                                    font: Tokens.font.label.medium
+                                    color: Colours.palette.m3onSurface
+                                    elide: Text.ElideRight
+                                }
+
+                                MaterialIcon {
+                                    visible: fsModel.sortField === headerCell.modelData.sort
+                                    text: fsModel.sortOrder === Qt.AscendingOrder ? "arrow_upward" : "arrow_downward"
+                                    fontStyle: Tokens.font.icon.small
+                                    color: Colours.palette.m3primary
+                                }
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: listRoot.toggleSort(headerCell.modelData.sort, headerCell.modelData.descendingFirst)
+                            }
+                        }
                     }
                 }
             }
 
-            ScrollBar.vertical: StyledScrollBar {
-                flickable: listView
-            }
+            // Details list view
+            VerticalFadeListView {
+                id: listView
 
-            model: fsModel
+                Layout.fillWidth: true
+                Layout.fillHeight: true
 
-            delegate: Item {
-                id: listDelegate
+                clip: true
+                focus: true
+                currentIndex: -1
+                interactive: true
+                boundsBehavior: Flickable.DragAndOvershootBounds
+                maximumFlickVelocity: 5000
+                flickDeceleration: 5000
 
-                required property int index
-                required property var modelData
+                Component.onCompleted: forceActiveFocus()
 
-                width: listView.width
-                height: 36
+                Keys.onEscapePressed: currentIndex = -1
 
-                readonly property bool isSelected: listView.currentIndex === index
-                readonly property bool isHidden: listDelegate.modelData ? (listDelegate.modelData.isHidden || listDelegate.modelData.name.startsWith('.')) : false
+                Keys.onReturnPressed: root.triggerAcceptOrOpen()
+                Keys.onEnterPressed: root.triggerAcceptOrOpen()
 
-                StyledRect {
-                    anchors.fill: parent
-                    anchors.margins: 2
-                    radius: Tokens.rounding.small
-
-                    color: listDelegate.isSelected
-                        ? Colours.palette.m3secondaryContainer
-                        : (listHover.containsMouse ? Colours.tPalette.m3surfaceContainerHigh : "transparent")
-
-                    opacity: listDelegate.isHidden ? 0.58 : 1.0
-
-                    Behavior on opacity {
-                        Anim { type: Anim.FastEffects }
-                    }
-
-                    MouseArea {
-                        id: listHover
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        acceptedButtons: Qt.LeftButton | Qt.RightButton
-
-                        onClicked: mouse => {
-                            listView.forceActiveFocus();
-                            listView.currentIndex = listDelegate.index;
-                            if (AppController.singleClick && mouse.button === Qt.LeftButton) {
-                                root.handleItemClick(listDelegate.modelData);
-                            }
+                Keys.onPressed: event => {
+                    if (event.key === Qt.Key_Up || event.key === Qt.Key_K) {
+                        if (listView.currentIndex <= 0 && fsModel.count > 0) {
+                            listView.currentIndex = 0;
+                        } else {
+                            listView.decrementCurrentIndex();
                         }
-
-                        onDoubleClicked: mouse => {
-                            if (mouse.button === Qt.LeftButton && !AppController.singleClick) {
-                                root.handleItemClick(listDelegate.modelData);
-                            }
+                        event.accepted = true;
+                    } else if (event.key === Qt.Key_Down || event.key === Qt.Key_J) {
+                        if (listView.currentIndex === -1 && fsModel.count > 0) {
+                            listView.currentIndex = 0;
+                        } else {
+                            listView.incrementCurrentIndex();
+                        }
+                        event.accepted = true;
+                    } else if (event.key === Qt.Key_Backspace) {
+                        if (root.dialog.cwd.length > 1) {
+                            root.dialog.cwd = root.dialog.cwd.slice(0, root.dialog.cwd.length - 1);
+                            event.accepted = true;
                         }
                     }
+                }
 
-                    RowLayout {
+                ScrollBar.vertical: StyledScrollBar {
+                    flickable: listView
+                }
+
+                model: fsModel
+
+                delegate: Item {
+                    id: listDelegate
+
+                    required property int index
+                    required property var modelData
+
+                    width: listView.width
+                    height: 36
+
+                    readonly property bool isSelected: listView.currentIndex === index
+                    readonly property bool isHidden: listDelegate.modelData ? (listDelegate.modelData.isHidden || listDelegate.modelData.name.startsWith('.')) : false
+
+                    StyledRect {
                         anchors.fill: parent
-                        anchors.leftMargin: Tokens.padding.small
-                        anchors.rightMargin: Tokens.padding.medium
-                        spacing: Tokens.spacing.small
+                        anchors.margins: 2
+                        radius: Tokens.rounding.small
 
-                        CachingIconImage {
-                            Layout.preferredWidth: 20
-                            Layout.preferredHeight: 20
-                            Layout.alignment: Qt.AlignVCenter
+                        color: listDelegate.isSelected
+                            ? Colours.palette.m3secondaryContainer
+                            : (listHover.containsMouse ? Colours.tPalette.m3surfaceContainerHigh : Qt.alpha(Colours.tPalette.m3surfaceContainerHigh, 0))
 
-                            source: {
-                                const file = listDelegate.modelData;
-                                if (!file) return "";
-                                return FileUtils.iconForFile(file.name, file.isDir, file.mimeType);
+                        opacity: listDelegate.isHidden ? 0.58 : 1.0
+
+                        Behavior on opacity {
+                            Anim { type: Anim.FastEffects }
+                        }
+
+                        MouseArea {
+                            id: listHover
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            acceptedButtons: Qt.LeftButton | Qt.RightButton
+
+                            onClicked: mouse => {
+                                listView.forceActiveFocus();
+                                listView.currentIndex = listDelegate.index;
+                                if (AppController.singleClick && mouse.button === Qt.LeftButton) {
+                                    root.handleItemClick(listDelegate.modelData);
+                                }
+                            }
+
+                            onDoubleClicked: mouse => {
+                                if (mouse.button === Qt.LeftButton && !AppController.singleClick) {
+                                    root.handleItemClick(listDelegate.modelData);
+                                }
                             }
                         }
 
-                        StyledText {
-                            Layout.fillWidth: true
-                            Layout.alignment: Qt.AlignVCenter
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: Tokens.padding.medium
+                            anchors.rightMargin: Tokens.padding.medium
+                            spacing: Tokens.spacing.small
 
-                            text: listDelegate.modelData ? listDelegate.modelData.name : ""
-                            color: listDelegate.isSelected ? Colours.palette.m3onSecondaryContainer : Colours.palette.m3onSurface
-                            font: Tokens.font.body.medium
-                            elide: Text.ElideMiddle
-                            verticalAlignment: Text.AlignVCenter
-                        }
+                            // Name + icon + lock/symlink indicators
+                            RowLayout {
+                                Layout.fillWidth: true
+                                Layout.minimumWidth: 120
+                                spacing: Tokens.spacing.small
 
-                        StyledText {
-                            Layout.preferredWidth: 80
-                            Layout.alignment: Qt.AlignVCenter
+                                Item {
+                                    implicitWidth: 20
+                                    implicitHeight: 20
 
-                            text: listDelegate.modelData && !listDelegate.modelData.isDir ? (listDelegate.modelData.formattedSize || "") : ""
-                            color: Colours.palette.m3onSurfaceVariant
-                            font: Tokens.font.body.small
-                            horizontalAlignment: Text.AlignRight
-                            verticalAlignment: Text.AlignVCenter
-                        }
+                                    CachingIconImage {
+                                        anchors.fill: parent
+                                        implicitSize: 20
 
-                        StyledText {
-                            Layout.preferredWidth: 100
-                            Layout.alignment: Qt.AlignVCenter
+                                        source: {
+                                            const file = listDelegate.modelData;
+                                            if (!file) return "";
+                                            return FileUtils.iconForFile(file.name, file.isDir, file.mimeType);
+                                        }
+                                    }
 
-                            text: listDelegate.modelData ? (listDelegate.modelData.formattedDate || "") : ""
-                            color: Colours.palette.m3onSurfaceVariant
-                            font: Tokens.font.body.small
-                            horizontalAlignment: Text.AlignRight
-                            verticalAlignment: Text.AlignVCenter
-                        }
+                                    MaterialIcon {
+                                        anchors.top: parent.top
+                                        anchors.left: parent.left
+                                        anchors.margins: -4
+                                        visible: listDelegate.modelData ? listDelegate.modelData.isReadOnly : false
+                                        text: "lock"
+                                        fontStyle: Tokens.font.icon.small
+                                        color: Colours.palette.m3error
+                                        z: 2
+                                    }
 
-                        StyledText {
-                            Layout.preferredWidth: 100
-                            Layout.alignment: Qt.AlignVCenter
+                                    MaterialIcon {
+                                        anchors.bottom: parent.bottom
+                                        anchors.right: parent.right
+                                        anchors.margins: -3
+                                        visible: listDelegate.modelData ? listDelegate.modelData.isSymLink : false
+                                        text: "link"
+                                        fontStyle: Tokens.font.icon.small
+                                        color: Colours.palette.m3primary
+                                        z: 2
+                                    }
+                                }
 
-                            text: listDelegate.modelData ? (listDelegate.modelData.mimeDescription || "") : ""
-                            color: Colours.palette.m3onSurfaceVariant
-                            font: Tokens.font.body.small
-                            elide: Text.ElideMiddle
-                            verticalAlignment: Text.AlignVCenter
+                                StyledText {
+                                    Layout.fillWidth: true
+                                    text: listDelegate.modelData ? listDelegate.modelData.name : ""
+                                    color: listDelegate.isSelected ? Colours.palette.m3onSecondaryContainer : Colours.palette.m3onSurface
+                                    font: Tokens.font.body.small
+                                    elide: Text.ElideMiddle
+                                }
+                            }
+
+                            Repeater {
+                                model: listRoot.columnSpecs
+
+                                delegate: StyledText {
+                                    required property var modelData
+
+                                    Layout.preferredWidth: listRoot.colWidth(modelData.key)
+                                    text: listRoot.cellText(listDelegate.modelData, modelData.key)
+                                    color: Colours.palette.m3onSurfaceVariant
+                                    font: Tokens.font.body.small
+                                    horizontalAlignment: modelData.alignRight ? Text.AlignRight : Text.AlignLeft
+                                    elide: Text.ElideRight
+                                }
+                            }
                         }
                     }
                 }
