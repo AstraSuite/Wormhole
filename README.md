@@ -38,7 +38,7 @@ It provides a unified D-Bus portal daemon (`xdg-desktop-portal-wormhole`) and Ma
   - Window and fullscreen snapshot modes.
   - Precision pixel color picker tool (`PickColor`).
 - **FileChooser Portal (`org.freedesktop.impl.portal.FileChooser`)**:
-  - Seamless delegation to `atlas --picker` for Material 3 file and folder selection, saving, and multi-file handling.
+  - Built-in Material 3 file dialog for opening, saving, folder selection and multi-file selection, with the same navigation as Atlas.
 - **Application Chooser (`org.freedesktop.impl.portal.AppChooser`)**:
   - Searchable Material 3 app chooser filtering system desktop entries by MIME type or URL protocol scheme.
 - **Access & Permissions (`org.freedesktop.impl.portal.Access`)**:
@@ -65,7 +65,6 @@ It provides a unified D-Bus portal daemon (`xdg-desktop-portal-wormhole`) and Ma
 - **PipeWire** (`libpipewire-0.3`)
 - **Wayland Client** (`wayland-client`)
 - **Wayland Protocols** (`wayland-protocols` ≥ 1.38) and `wayland-scanner`
-- **Atlas** (runtime dependency for file choosing)
 
 Screen capture uses `ext-image-copy-capture-v1`, so the compositor has to
 implement it along with `ext-image-capture-source-v1`. Window capture
