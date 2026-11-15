@@ -88,13 +88,6 @@ StyledRect {
     }
 
     Shortcut {
-        sequence: "Escape"
-        enabled: root.visible
-        context: Qt.ApplicationShortcut
-        onActivated: root.rejected()
-    }
-
-    Shortcut {
         sequence: "Ctrl+H"
         enabled: root.visible
         context: Qt.ApplicationShortcut
