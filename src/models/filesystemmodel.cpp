@@ -10,6 +10,7 @@
 #include <QFileInfo>
 #include <QImageReader>
 #include <QMimeDatabase>
+#include <QRegularExpression>
 #include <QtConcurrent>
 #include <algorithm>
 
@@ -618,6 +619,14 @@ QList<FileSystemEntry*> FileSystemModel::filterAndSortOnly(const QList<FileSyste
     QList<FileSystemEntry*> result;
     QString lowerFilter = m_filterText.toLower();
 
+    QList<QRegularExpression> filterRegexes;
+    if (!m_nameFilters.isEmpty() && !m_nameFilters.contains(QStringLiteral("*")) && !m_nameFilters.contains(QStringLiteral("*.*"))) {
+        filterRegexes.reserve(m_nameFilters.size());
+        for (const QString& f : m_nameFilters) {
+            filterRegexes.append(QRegularExpression::fromWildcard(f, Qt::CaseInsensitive));
+        }
+    }
+
     for (auto* e : source) {
         if (!m_showHidden && e->isHidden())
             continue;
@@ -625,10 +634,10 @@ QList<FileSystemEntry*> FileSystemModel::filterAndSortOnly(const QList<FileSyste
         if (!lowerFilter.isEmpty() && !e->name().toLower().contains(lowerFilter))
             continue;
 
-        if (!m_nameFilters.isEmpty() && !m_nameFilters.contains("*") && !e->isDir()) {
+        if (!filterRegexes.isEmpty() && !e->isDir()) {
             bool matches = false;
-            for (const QString& f : m_nameFilters) {
-                if (f == "*" || f == "*.*" || f.toLower() == e->suffix().toLower()) {
+            for (const QRegularExpression& re : filterRegexes) {
+                if (re.match(e->name()).hasMatch()) {
                     matches = true;
                     break;
                 }

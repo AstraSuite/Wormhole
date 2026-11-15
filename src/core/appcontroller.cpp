@@ -4,6 +4,7 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QProcess>
+#include <QRegularExpression>
 #include <QSettings>
 #include <QStandardPaths>
 #include <QUrl>
@@ -292,6 +293,22 @@ void AppController::setPortalHandle(const QString& handle) {
 
 bool AppController::fileExists(const QString& path) {
     return QFileInfo::exists(path);
+}
+
+bool AppController::matchesFilters(const QString& fileName, const QStringList& patterns) {
+    if (patterns.isEmpty() || patterns.contains(QStringLiteral("*")) || patterns.contains(QStringLiteral("*.*"))) {
+        return true;
+    }
+    for (const QString& pattern : patterns) {
+        if (pattern == QLatin1String("*") || pattern == QLatin1String("*.*")) {
+            return true;
+        }
+        const QRegularExpression re = QRegularExpression::fromWildcard(pattern, Qt::CaseInsensitive);
+        if (re.match(fileName).hasMatch()) {
+            return true;
+        }
+    }
+    return false;
 }
 
 QString AppController::toFileUri(const QString& path) {

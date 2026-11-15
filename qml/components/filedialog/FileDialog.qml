@@ -57,9 +57,7 @@ StyledRect {
             return false;
         if (file.isDir)
             return false;
-        if (filters.includes("*"))
-            return true;
-        return filters.includes(file.suffix.toLowerCase()) || filters.includes(file.suffix);
+        return AppController.matchesFilters(file.name, filters);
     }
 
     Component.onCompleted: {

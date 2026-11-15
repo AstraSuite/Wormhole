@@ -107,7 +107,7 @@ StyledRect {
                     if (root.dialog.directoryOnly) return qsTr("Folders only");
                     let label = root.dialog.filterLabel || qsTr("All Files");
                     if (root.dialog.filters && Array.isArray(root.dialog.filters) && root.dialog.filters.length > 0) {
-                        return `${label} (${root.dialog.filters.map(f => f === '*' ? '*.*' : `*.${f}`).join(", ")})`;
+                        return `${label} (${root.dialog.filters.map(f => f === '*' ? '*.*' : f).join(", ")})`;
                     }
                     return label;
                 }

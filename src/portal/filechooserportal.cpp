@@ -86,10 +86,8 @@ void FileChooserPortal::parseFilters(const QVariantMap& options, QStringList& ou
             arg >> type >> pattern;
 
             if (type == 0) { // Glob pattern
-                if (pattern.startsWith(QLatin1String("*."))) {
-                    pattern = pattern.mid(2);
-                } else if (pattern.startsWith(QLatin1Char('.'))) {
-                    pattern = pattern.mid(1);
+                if (pattern.startsWith(QLatin1Char('.'))) {
+                    pattern.prepend(QLatin1Char('*'));
                 }
                 if (!pattern.isEmpty() && !outFilters.contains(pattern)) {
                     outFilters << pattern;
@@ -97,9 +95,9 @@ void FileChooserPortal::parseFilters(const QVariantMap& options, QStringList& ou
             } else if (type == 1) { // MIME type
                 QMimeType mime = mimeDb.mimeTypeForName(pattern);
                 if (mime.isValid()) {
-                    for (const QString& suf : mime.suffixes()) {
-                        if (!outFilters.contains(suf)) {
-                            outFilters << suf;
+                    for (const QString& glob : mime.globPatterns()) {
+                        if (!outFilters.contains(glob)) {
+                            outFilters << glob;
                         }
                     }
                 }

@@ -209,6 +209,7 @@ public:
     void setViewMode(int mode);
 
     Q_INVOKABLE static bool fileExists(const QString& path);
+    Q_INVOKABLE static bool matchesFilters(const QString& fileName, const QStringList& patterns);
     Q_INVOKABLE static QString toFileUri(const QString& path);
     Q_INVOKABLE QStringList buildSelectedUris(const QString& path) const;
 

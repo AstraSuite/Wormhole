@@ -15,6 +15,7 @@ Item {
     FileSystemModel {
         id: fsModel
         path: root.dialog.currentPath
+        nameFilters: root.dialog.filters
         showHidden: root.dialog.showHidden
         caseSensitiveSort: AppController.caseSensitiveSort
         showDirsFirst: AppController.showDirsFirst
