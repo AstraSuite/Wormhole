@@ -205,6 +205,7 @@ public:
     void setViewMode(int mode);
 
     Q_INVOKABLE static bool fileExists(const QString& path);
+    Q_INVOKABLE static QString toFileUri(const QString& path);
 
     Q_INVOKABLE void accept(const QVariantMap& results = {});
     Q_INVOKABLE void reject();

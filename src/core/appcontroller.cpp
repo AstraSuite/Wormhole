@@ -287,6 +287,13 @@ bool AppController::fileExists(const QString& path) {
     return QFileInfo::exists(path);
 }
 
+QString AppController::toFileUri(const QString& path) {
+    if (path.startsWith(QLatin1String("file://"))) {
+        return path;
+    }
+    return QUrl::fromLocalFile(path).toString(QUrl::FullyEncoded);
+}
+
 void AppController::accept(const QVariantMap& results) {
     emit accepted(results);
 }

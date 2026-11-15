@@ -244,7 +244,7 @@ void FileChooserPortal::finishRequest(const QString& handlePath, quint32 respons
             if (item.startsWith(QLatin1String("file://"))) {
                 formattedUris.append(item);
             } else {
-                formattedUris.append(QUrl::fromLocalFile(item).toString());
+                formattedUris.append(QUrl::fromLocalFile(item).toString(QUrl::FullyEncoded));
             }
         }
         sanitizedResults.insert(QStringLiteral("uris"), formattedUris);
