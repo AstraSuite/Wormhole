@@ -70,6 +70,7 @@ private:
     void sendResponse(const QString& handlePath, quint32 response, const QVariantMap& results);
     void cleanupRequest(const QString& handlePath);
 
+    static QString decodePortalPath(const QVariant& var);
     static QString parseInitialDirectory(const QVariantMap& options);
     static void parseFilters(const QVariantMap& options, QStringList& outFilters, QString& outLabel);
 
