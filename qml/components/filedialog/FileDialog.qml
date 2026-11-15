@@ -17,7 +17,7 @@ StyledRect {
     readonly property bool saveMode: AppController.saveMode
     property string saveName: AppController.suggestedName
     readonly property string savePath: currentPath === "/" ? "/" + saveName : currentPath + "/" + saveName
-    readonly property bool saveWouldOverwrite: saveMode && saveName.length > 0 && AppController.fileExists(savePath)
+    readonly property bool saveWouldOverwrite: saveMode && !directoryOnly && saveName.length > 0 && AppController.fileExists(savePath)
     property real zoomLevel: 80
     property int viewMode: AppController.viewMode
 

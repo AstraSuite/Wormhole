@@ -220,7 +220,10 @@ void FileChooserPortal::SaveFiles(const QDBusObjectPath& handle,
         while (!arg.atEnd()) {
             QByteArray rawFile;
             arg >> rawFile;
-            files << decodePortalPath(rawFile);
+            const QString fileStr = decodePortalPath(rawFile);
+            if (!fileStr.isEmpty()) {
+                files << QFileInfo(fileStr).fileName();
+            }
         }
         arg.endArray();
     }

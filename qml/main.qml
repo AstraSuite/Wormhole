@@ -167,7 +167,7 @@ Window {
         FileDialog {
             implicitWidth: 1000
             implicitHeight: 600
-            onAccepted: path => { console.log("FileDialog onAccepted: path=", path); window.finishDialog({ "uris": [AppController.toFileUri(path)] }, 0) }
+            onAccepted: path => { console.log("FileDialog onAccepted: path=", path); window.finishDialog({ "uris": AppController.buildSelectedUris(path) }, 0) }
             onRejected: { console.log("FileDialog onRejected"); window.finishDialog({}, 1) }
         }
     }

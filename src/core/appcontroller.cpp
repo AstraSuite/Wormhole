@@ -232,6 +232,13 @@ void AppController::setSuggestedName(const QString& name) {
     }
 }
 
+void AppController::setSaveFiles(const QStringList& files) {
+    if (m_saveFiles != files) {
+        m_saveFiles = files;
+        emit saveFilesChanged();
+    }
+}
+
 void AppController::setShowHidden(bool show) {
     if (m_showHidden != show) {
         m_showHidden = show;
@@ -292,6 +299,24 @@ QString AppController::toFileUri(const QString& path) {
         return path;
     }
     return QUrl::fromLocalFile(path).toString(QUrl::FullyEncoded);
+}
+
+QStringList AppController::buildSelectedUris(const QString& path) const {
+    if (m_directoryOnly && m_saveMode && !m_saveFiles.isEmpty()) {
+        QStringList uris;
+        uris.reserve(m_saveFiles.size());
+        const QDir dir(path);
+        for (const QString& file : m_saveFiles) {
+            const QString baseName = QFileInfo(file).fileName();
+            if (!baseName.isEmpty()) {
+                uris.append(toFileUri(dir.filePath(baseName)));
+            }
+        }
+        if (!uris.isEmpty()) {
+            return uris;
+        }
+    }
+    return { toFileUri(path) };
 }
 
 void AppController::accept(const QVariantMap& results) {

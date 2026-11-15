@@ -74,6 +74,7 @@ bool PortalDaemon::start() {
         ctrl->setFilterLabel(filterLabel);
         ctrl->setDirectoryOnly(directoryOnly);
         ctrl->setSuggestedName(QString());
+        ctrl->setSaveFiles(QStringList());
         ctrl->setInitialDirectory(initialDir);
         ctrl->setSaveMode(false);
         ctrl->setDialogMode(wormhole::core::AppController::DialogMode::FileChooser);
@@ -89,6 +90,7 @@ bool PortalDaemon::start() {
         ctrl->setFilterLabel(filterLabel);
         ctrl->setDirectoryOnly(false);
         ctrl->setSuggestedName(suggestedName);
+        ctrl->setSaveFiles(QStringList());
         ctrl->setInitialDirectory(initialDir);
         ctrl->setSaveMode(true);
         ctrl->setDialogMode(wormhole::core::AppController::DialogMode::FileChooser);
@@ -97,10 +99,12 @@ bool PortalDaemon::start() {
     connect(m_fileChooser, &FileChooserPortal::saveFilesRequested,
             ctrl, [ctrl](const QString& handle, const QString& title,
                          const QStringList& fileList, const QString& initialDir) {
-        Q_UNUSED(fileList)
         ctrl->setPortalHandle(handle);
         ctrl->setTitle(title);
+        ctrl->setFilters({ QStringLiteral("*") });
+        ctrl->setFilterLabel(QStringLiteral("All files"));
         ctrl->setSuggestedName(QString());
+        ctrl->setSaveFiles(fileList);
         ctrl->setInitialDirectory(initialDir);
         ctrl->setDirectoryOnly(true);
         ctrl->setSaveMode(true);
