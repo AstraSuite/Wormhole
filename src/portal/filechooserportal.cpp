@@ -2,6 +2,7 @@
 #include <QDBusArgument>
 #include <QDebug>
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QMimeDatabase>
 #include <QMimeType>
@@ -13,39 +14,34 @@ FileChooserPortal::FileChooserPortal(QObject* parent)
     : QDBusAbstractAdaptor(parent) {
 }
 
+QString FileChooserPortal::decodePortalPath(const QVariant& var) {
+    QString raw;
+    if (var.userType() == QMetaType::QByteArray) {
+        QByteArray bytes = var.toByteArray();
+        if (bytes.endsWith('\0')) {
+            bytes.chop(1);
+        }
+        raw = QFile::decodeName(bytes);
+    } else {
+        raw = var.toString();
+    }
+    if (raw.startsWith(QLatin1String("file://"))) {
+        raw = QUrl(raw).toLocalFile();
+    }
+    return raw;
+}
+
 QString FileChooserPortal::parseInitialDirectory(const QVariantMap& options) {
     QString raw;
     if (options.contains(QStringLiteral("current_folder"))) {
-        QVariant var = options.value(QStringLiteral("current_folder"));
-        if (var.userType() == QMetaType::QByteArray) {
-            QByteArray bytes = var.toByteArray();
-            if (bytes.endsWith('\0')) {
-                bytes.chop(1);
-            }
-            raw = QString::fromUtf8(bytes);
-        } else {
-            raw = var.toString();
-        }
+        raw = decodePortalPath(options.value(QStringLiteral("current_folder")));
     }
     if (raw.isEmpty() && options.contains(QStringLiteral("current_file"))) {
-        QVariant var = options.value(QStringLiteral("current_file"));
-        if (var.userType() == QMetaType::QByteArray) {
-            QByteArray bytes = var.toByteArray();
-            if (bytes.endsWith('\0')) {
-                bytes.chop(1);
-            }
-            raw = QString::fromUtf8(bytes);
-        } else {
-            raw = var.toString();
-        }
+        raw = decodePortalPath(options.value(QStringLiteral("current_file")));
     }
 
     if (raw.isEmpty()) {
         return {};
-    }
-
-    if (raw.startsWith(QLatin1String("file://"))) {
-        raw = QUrl(raw).toLocalFile();
     }
 
     QFileInfo fi(raw);
@@ -90,10 +86,8 @@ void FileChooserPortal::parseFilters(const QVariantMap& options, QStringList& ou
             arg >> type >> pattern;
 
             if (type == 0) { // Glob pattern
-                if (pattern.startsWith(QLatin1String("*."))) {
-                    pattern = pattern.mid(2);
-                } else if (pattern.startsWith(QLatin1Char('.'))) {
-                    pattern = pattern.mid(1);
+                if (pattern.startsWith(QLatin1Char('.'))) {
+                    pattern.prepend(QLatin1Char('*'));
                 }
                 if (!pattern.isEmpty() && !outFilters.contains(pattern)) {
                     outFilters << pattern;
@@ -101,9 +95,9 @@ void FileChooserPortal::parseFilters(const QVariantMap& options, QStringList& ou
             } else if (type == 1) { // MIME type
                 QMimeType mime = mimeDb.mimeTypeForName(pattern);
                 if (mime.isValid()) {
-                    for (const QString& suf : mime.suffixes()) {
-                        if (!outFilters.contains(suf)) {
-                            outFilters << suf;
+                    for (const QString& glob : mime.globPatterns()) {
+                        if (!outFilters.contains(glob)) {
+                            outFilters << glob;
                         }
                     }
                 }
@@ -180,6 +174,12 @@ void FileChooserPortal::SaveFile(const QDBusObjectPath& handle,
     if (options.contains(QStringLiteral("current_name"))) {
         suggestedName = options.value(QStringLiteral("current_name")).toString();
     }
+    if (suggestedName.isEmpty() && options.contains(QStringLiteral("current_file"))) {
+        const QString fileStr = decodePortalPath(options.value(QStringLiteral("current_file")));
+        if (!fileStr.isEmpty()) {
+            suggestedName = QFileInfo(fileStr).fileName();
+        }
+    }
 
     QStringList filters;
     QString filterLabel;
@@ -218,10 +218,10 @@ void FileChooserPortal::SaveFiles(const QDBusObjectPath& handle,
         while (!arg.atEnd()) {
             QByteArray rawFile;
             arg >> rawFile;
-            if (rawFile.endsWith('\0')) {
-                rawFile.chop(1);
+            const QString fileStr = decodePortalPath(rawFile);
+            if (!fileStr.isEmpty()) {
+                files << QFileInfo(fileStr).fileName();
             }
-            files << QString::fromUtf8(rawFile);
         }
         arg.endArray();
     }
@@ -245,7 +245,7 @@ void FileChooserPortal::finishRequest(const QString& handlePath, quint32 respons
             if (item.startsWith(QLatin1String("file://"))) {
                 formattedUris.append(item);
             } else {
-                formattedUris.append(QUrl::fromLocalFile(item).toString());
+                formattedUris.append(QUrl::fromLocalFile(item).toString(QUrl::FullyEncoded));
             }
         }
         sanitizedResults.insert(QStringLiteral("uris"), formattedUris);

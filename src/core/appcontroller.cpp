@@ -4,6 +4,7 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QProcess>
+#include <QRegularExpression>
 #include <QSettings>
 #include <QStandardPaths>
 #include <QUrl>
@@ -232,6 +233,13 @@ void AppController::setSuggestedName(const QString& name) {
     }
 }
 
+void AppController::setSaveFiles(const QStringList& files) {
+    if (m_saveFiles != files) {
+        m_saveFiles = files;
+        emit saveFilesChanged();
+    }
+}
+
 void AppController::setShowHidden(bool show) {
     if (m_showHidden != show) {
         m_showHidden = show;
@@ -285,6 +293,47 @@ void AppController::setPortalHandle(const QString& handle) {
 
 bool AppController::fileExists(const QString& path) {
     return QFileInfo::exists(path);
+}
+
+bool AppController::matchesFilters(const QString& fileName, const QStringList& patterns) {
+    if (patterns.isEmpty() || patterns.contains(QStringLiteral("*")) || patterns.contains(QStringLiteral("*.*"))) {
+        return true;
+    }
+    for (const QString& pattern : patterns) {
+        if (pattern == QLatin1String("*") || pattern == QLatin1String("*.*")) {
+            return true;
+        }
+        const QRegularExpression re = QRegularExpression::fromWildcard(pattern, Qt::CaseInsensitive);
+        if (re.match(fileName).hasMatch()) {
+            return true;
+        }
+    }
+    return false;
+}
+
+QString AppController::toFileUri(const QString& path) {
+    if (path.startsWith(QLatin1String("file://"))) {
+        return path;
+    }
+    return QUrl::fromLocalFile(path).toString(QUrl::FullyEncoded);
+}
+
+QStringList AppController::buildSelectedUris(const QString& path) const {
+    if (m_directoryOnly && m_saveMode && !m_saveFiles.isEmpty()) {
+        QStringList uris;
+        uris.reserve(m_saveFiles.size());
+        const QDir dir(path);
+        for (const QString& file : m_saveFiles) {
+            const QString baseName = QFileInfo(file).fileName();
+            if (!baseName.isEmpty()) {
+                uris.append(toFileUri(dir.filePath(baseName)));
+            }
+        }
+        if (!uris.isEmpty()) {
+            return uris;
+        }
+    }
+    return { toFileUri(path) };
 }
 
 void AppController::accept(const QVariantMap& results) {

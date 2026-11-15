@@ -17,7 +17,7 @@ StyledRect {
     readonly property bool saveMode: AppController.saveMode
     property string saveName: AppController.suggestedName
     readonly property string savePath: currentPath === "/" ? "/" + saveName : currentPath + "/" + saveName
-    readonly property bool saveWouldOverwrite: saveMode && saveName.length > 0 && AppController.fileExists(savePath)
+    readonly property bool saveWouldOverwrite: saveMode && !directoryOnly && saveName.length > 0 && AppController.fileExists(savePath)
     property real zoomLevel: 80
     property int viewMode: AppController.viewMode
 
@@ -57,9 +57,7 @@ StyledRect {
             return false;
         if (file.isDir)
             return false;
-        if (filters.includes("*"))
-            return true;
-        return filters.includes(file.suffix.toLowerCase()) || filters.includes(file.suffix);
+        return AppController.matchesFilters(file.name, filters);
     }
 
     Component.onCompleted: {
@@ -75,6 +73,9 @@ StyledRect {
                 root.cwd = root.pathToCwd(AppController.initialDirectory);
             }
         }
+        function onSuggestedNameChanged() {
+            root.saveName = AppController.suggestedName;
+        }
     }
 
     Connections {
@@ -84,13 +85,6 @@ StyledRect {
                 root.cwd = root.pathToCwd(mountPoint);
             }
         }
-    }
-
-    Shortcut {
-        sequence: "Escape"
-        enabled: root.visible
-        context: Qt.ApplicationShortcut
-        onActivated: root.rejected()
     }
 
     Shortcut {

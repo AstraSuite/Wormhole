@@ -33,7 +33,7 @@ StyledRect {
 
         RowLayout {
             Layout.fillWidth: true
-            visible: root.dialog.saveMode
+            visible: root.dialog.saveMode && !root.dialog.directoryOnly
             spacing: Tokens.spacing.small
 
             StyledText {
@@ -58,8 +58,17 @@ StyledRect {
                     font: Tokens.font.body.medium
                     selectByMouse: true
                     clip: true
-                    onTextChanged: root.dialog.saveName = text
+                    onTextEdited: root.dialog.saveName = text
                     onAccepted: root.commitSave()
+
+                    Connections {
+                        target: root.dialog
+                        function onSaveNameChanged() {
+                            if (saveNameInput.text !== root.dialog.saveName) {
+                                saveNameInput.text = root.dialog.saveName;
+                            }
+                        }
+                    }
                 }
             }
 
@@ -98,7 +107,7 @@ StyledRect {
                     if (root.dialog.directoryOnly) return qsTr("Folders only");
                     let label = root.dialog.filterLabel || qsTr("All Files");
                     if (root.dialog.filters && Array.isArray(root.dialog.filters) && root.dialog.filters.length > 0) {
-                        return `${label} (${root.dialog.filters.map(f => f === '*' ? '*.*' : `*.${f}`).join(", ")})`;
+                        return `${label} (${root.dialog.filters.map(f => f === '*' ? '*.*' : f).join(", ")})`;
                     }
                     return label;
                 }
@@ -190,7 +199,7 @@ StyledRect {
             implicitHeight: selectText.implicitHeight + Tokens.padding.medium * 2
 
             StateLayer {
-                disabled: root.dialog.saveMode
+                disabled: (root.dialog.saveMode && !root.dialog.directoryOnly)
                     ? root.dialog.saveName.trim().length === 0
                     : !root.dialog.selectionValid
                 onClicked: {
@@ -198,7 +207,7 @@ StyledRect {
                                 "selectionValid=", root.dialog.selectionValid,
                                 "directoryOnly=", root.dialog.directoryOnly,
                                 "disabled=", disabled)
-                    if (root.dialog.saveMode) {
+                    if (root.dialog.saveMode && !root.dialog.directoryOnly) {
                         root.commitSave();
                     } else if (root.dialog.selectionValid) {
                         if (root.dialog.directoryOnly) {
@@ -227,7 +236,7 @@ StyledRect {
                     ? (root.dialog.saveWouldOverwrite ? qsTr("Overwrite") : qsTr("Save"))
                     : (root.dialog.directoryOnly ? qsTr("Select Folder") : qsTr("Select"))
                 color: {
-                    if (root.dialog.saveMode) {
+                    if (root.dialog.saveMode && !root.dialog.directoryOnly) {
                         if (root.dialog.saveName.trim().length === 0)
                             return Colours.palette.m3outline;
                         return root.dialog.saveWouldOverwrite ? Colours.palette.m3error : Colours.palette.m3onSurface;

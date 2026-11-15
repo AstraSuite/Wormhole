@@ -67,40 +67,48 @@ bool PortalDaemon::start() {
             ctrl, [ctrl](const QString& handle, const QString& title,
                          const QStringList& filters, const QString& filterLabel,
                          bool directoryOnly, bool multiple, const QString& initialDir) {
-        ctrl->setDialogMode(wormhole::core::AppController::DialogMode::FileChooser);
+        Q_UNUSED(multiple)
         ctrl->setPortalHandle(handle);
         ctrl->setTitle(title);
         ctrl->setFilters(filters);
         ctrl->setFilterLabel(filterLabel);
         ctrl->setDirectoryOnly(directoryOnly);
+        ctrl->setSuggestedName(QString());
+        ctrl->setSaveFiles(QStringList());
         ctrl->setInitialDirectory(initialDir);
         ctrl->setSaveMode(false);
+        ctrl->setDialogMode(wormhole::core::AppController::DialogMode::FileChooser);
     });
 
     connect(m_fileChooser, &FileChooserPortal::saveFileRequested,
             ctrl, [ctrl](const QString& handle, const QString& title,
                          const QStringList& filters, const QString& filterLabel,
                          const QString& suggestedName, const QString& initialDir) {
-        ctrl->setDialogMode(wormhole::core::AppController::DialogMode::FileChooser);
         ctrl->setPortalHandle(handle);
         ctrl->setTitle(title);
         ctrl->setFilters(filters);
         ctrl->setFilterLabel(filterLabel);
+        ctrl->setDirectoryOnly(false);
         ctrl->setSuggestedName(suggestedName);
+        ctrl->setSaveFiles(QStringList());
         ctrl->setInitialDirectory(initialDir);
         ctrl->setSaveMode(true);
+        ctrl->setDialogMode(wormhole::core::AppController::DialogMode::FileChooser);
     });
 
     connect(m_fileChooser, &FileChooserPortal::saveFilesRequested,
             ctrl, [ctrl](const QString& handle, const QString& title,
                          const QStringList& fileList, const QString& initialDir) {
-        Q_UNUSED(fileList)
-        ctrl->setDialogMode(wormhole::core::AppController::DialogMode::FileChooser);
         ctrl->setPortalHandle(handle);
         ctrl->setTitle(title);
+        ctrl->setFilters({ QStringLiteral("*") });
+        ctrl->setFilterLabel(QStringLiteral("All files"));
+        ctrl->setSuggestedName(QString());
+        ctrl->setSaveFiles(fileList);
         ctrl->setInitialDirectory(initialDir);
         ctrl->setDirectoryOnly(true);
         ctrl->setSaveMode(true);
+        ctrl->setDialogMode(wormhole::core::AppController::DialogMode::FileChooser);
     });
 
     connect(ctrl, &wormhole::core::AppController::portalRequestFinished,

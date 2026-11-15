@@ -34,6 +34,7 @@ class AppController : public QObject {
     Q_PROPERTY(bool directoryOnly READ directoryOnly WRITE setDirectoryOnly NOTIFY directoryOnlyChanged)
     Q_PROPERTY(bool saveMode READ saveMode NOTIFY saveModeChanged)
     Q_PROPERTY(QString suggestedName READ suggestedName NOTIFY suggestedNameChanged)
+    Q_PROPERTY(QStringList saveFiles READ saveFiles WRITE setSaveFiles NOTIFY saveFilesChanged)
     Q_PROPERTY(bool showHidden READ showHidden WRITE setShowHidden NOTIFY showHiddenChanged)
     Q_PROPERTY(int placesIconSize READ placesIconSize WRITE setPlacesIconSize NOTIFY placesIconSizeChanged)
     Q_PROPERTY(bool singleClick READ singleClick WRITE setSingleClick NOTIFY singleClickChanged)
@@ -186,6 +187,9 @@ public:
     QString suggestedName() const { return m_suggestedName; }
     void setSuggestedName(const QString& name);
 
+    QStringList saveFiles() const { return m_saveFiles; }
+    void setSaveFiles(const QStringList& files);
+
     bool showHidden() const { return m_showHidden; }
     void setShowHidden(bool show);
 
@@ -205,6 +209,9 @@ public:
     void setViewMode(int mode);
 
     Q_INVOKABLE static bool fileExists(const QString& path);
+    Q_INVOKABLE static bool matchesFilters(const QString& fileName, const QStringList& patterns);
+    Q_INVOKABLE static QString toFileUri(const QString& path);
+    Q_INVOKABLE QStringList buildSelectedUris(const QString& path) const;
 
     Q_INVOKABLE void accept(const QVariantMap& results = {});
     Q_INVOKABLE void reject();
@@ -248,6 +255,7 @@ signals:
     void directoryOnlyChanged();
     void saveModeChanged();
     void suggestedNameChanged();
+    void saveFilesChanged();
     void showHiddenChanged();
     void placesIconSizeChanged();
     void singleClickChanged();
@@ -304,6 +312,7 @@ private:
     bool m_directoryOnly = false;
     bool m_saveMode = false;
     QString m_suggestedName;
+    QStringList m_saveFiles;
     bool m_showHidden = false;
     int m_placesIconSize = 20;
     bool m_singleClick = false;

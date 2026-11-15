@@ -15,6 +15,7 @@ Item {
     FileSystemModel {
         id: fsModel
         path: root.dialog.currentPath
+        nameFilters: root.dialog.filters
         showHidden: root.dialog.showHidden
         caseSensitiveSort: AppController.caseSensitiveSort
         showDirsFirst: AppController.showDirsFirst
@@ -534,7 +535,7 @@ Item {
             let newCwd = root.dialog.cwd.slice();
             newCwd.push(file.name);
             root.dialog.cwd = newCwd;
-        } else if (root.dialog.saveMode) {
+        } else if (root.dialog.saveMode && !root.dialog.directoryOnly) {
             root.dialog.saveName = file.name;
         } else if (root.dialog.selectionValid && !root.dialog.directoryOnly) {
             root.dialog.accepted(file.path);
