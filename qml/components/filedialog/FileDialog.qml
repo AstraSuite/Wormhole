@@ -75,6 +75,9 @@ StyledRect {
                 root.cwd = root.pathToCwd(AppController.initialDirectory);
             }
         }
+        function onSuggestedNameChanged() {
+            root.saveName = AppController.suggestedName;
+        }
     }
 
     Connections {

@@ -58,8 +58,17 @@ StyledRect {
                     font: Tokens.font.body.medium
                     selectByMouse: true
                     clip: true
-                    onTextChanged: root.dialog.saveName = text
+                    onTextEdited: root.dialog.saveName = text
                     onAccepted: root.commitSave()
+
+                    Connections {
+                        target: root.dialog
+                        function onSaveNameChanged() {
+                            if (saveNameInput.text !== root.dialog.saveName) {
+                                saveNameInput.text = root.dialog.saveName;
+                            }
+                        }
+                    }
                 }
             }
 

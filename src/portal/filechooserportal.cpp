@@ -180,6 +180,25 @@ void FileChooserPortal::SaveFile(const QDBusObjectPath& handle,
     if (options.contains(QStringLiteral("current_name"))) {
         suggestedName = options.value(QStringLiteral("current_name")).toString();
     }
+    if (suggestedName.isEmpty() && options.contains(QStringLiteral("current_file"))) {
+        QVariant var = options.value(QStringLiteral("current_file"));
+        QString fileStr;
+        if (var.userType() == QMetaType::QByteArray) {
+            QByteArray bytes = var.toByteArray();
+            if (bytes.endsWith('\0')) {
+                bytes.chop(1);
+            }
+            fileStr = QString::fromUtf8(bytes);
+        } else {
+            fileStr = var.toString();
+        }
+        if (fileStr.startsWith(QLatin1String("file://"))) {
+            fileStr = QUrl(fileStr).toLocalFile();
+        }
+        if (!fileStr.isEmpty()) {
+            suggestedName = QFileInfo(fileStr).fileName();
+        }
+    }
 
     QStringList filters;
     QString filterLabel;
