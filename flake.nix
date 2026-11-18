@@ -40,6 +40,19 @@
       };
     });
 
+    apps = forAllSystems (pkgs: {
+      default = {
+        type = "app";
+        program = "${self.packages.${pkgs.stdenv.hostPlatform.system}.default}/bin/wormhole";
+        meta.description = "Launch Wormhole Material 3 XDG desktop portal daemon";
+      };
+      wormhole = {
+        type = "app";
+        program = "${self.packages.${pkgs.stdenv.hostPlatform.system}.default}/bin/wormhole";
+        meta.description = "Launch Wormhole Material 3 XDG desktop portal daemon";
+      };
+    });
+
     homeManagerModules.default = { config, lib, pkgs, ... }:
       with lib;
       let
