@@ -5,3 +5,6 @@ bin/
 .vscode/
 *.user
 *.log
+
+flake.lock
+
